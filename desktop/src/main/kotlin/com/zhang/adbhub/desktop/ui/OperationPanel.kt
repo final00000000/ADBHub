@@ -474,7 +474,7 @@ fun DeviceCommandsPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "执行结果",
+                    text = StringResources.get("operation.result"),
                     style = MaterialTheme.typography.titleSmall
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -566,7 +566,7 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                                 resultText = result
                             }
                         } else {
-                            resultText = "请输入包名和 Activity 名称"
+                            resultText = StringResources.get("operation.input.package.activity")
                         }
                     },
                     enabled = packageName.isNotBlank() && activityName.isNotBlank() && !isExecuting,
@@ -597,7 +597,7 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "应用信息",
+                    text = StringResources.get("operation.app.info"),
                     style = MaterialTheme.typography.titleSmall
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -608,7 +608,7 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                                 resultText = result
                             }
                         } else {
-                            resultText = "请输入包名"
+                            resultText = StringResources.get("operation.input.package")
                         }
                     },
                     enabled = packageName.isNotBlank() && !isExecuting,
@@ -623,10 +623,10 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                                 modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp
                             )
-                            Text("查询中...")
+                            Text(StringResources.get("operation.querying"))
                         }
                     } else {
-                        Text("查看应用信息")
+                        Text(StringResources.get("operation.view.app.info"))
                     }
                 }
             }
@@ -639,7 +639,7 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "应用操作",
+                    text = StringResources.get("operation.app.operations"),
                     style = MaterialTheme.typography.titleSmall
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -653,13 +653,13 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                                     resultText = result
                                 }
                             } else {
-                                resultText = "请输入包名"
+                                resultText = StringResources.get("operation.input.package")
                             }
                         },
                         enabled = packageName.isNotBlank() && !isExecuting,
                         modifier = Modifier.height(40.dp)
                     ) {
-                        Text("停止应用")
+                        Text(StringResources.get("operation.stop.app"))
                     }
                     Button(
                         onClick = {
@@ -668,7 +668,7 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                                     resultText = result
                                 }
                             } else {
-                                resultText = "请输入包名"
+                                resultText = StringResources.get("operation.input.package")
                             }
                         },
                         enabled = packageName.isNotBlank() && !isExecuting,
@@ -677,7 +677,7 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                             containerColor = MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Text("清除数据")
+                        Text(StringResources.get("operation.clear.data"))
                     }
                 }
             }
@@ -690,7 +690,7 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "执行结果",
+                    text = StringResources.get("operation.result"),
                     style = MaterialTheme.typography.titleSmall
                 )
                 Spacer(modifier = Modifier.height(8.dp))

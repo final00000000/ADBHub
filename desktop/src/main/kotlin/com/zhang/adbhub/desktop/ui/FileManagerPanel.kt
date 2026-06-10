@@ -272,7 +272,7 @@ fun PathNavigationBar(
                     editablePath = it
                     isPathValid = it.isNotBlank() && it.startsWith("/")
                     if (!isPathValid && it.isNotBlank()) {
-                        errorMessage = "路径必须以 / 开头"
+                        errorMessage = StringResources.get("file.manager.path.must.start.slash")
                     } else {
                         errorMessage = ""
                     }
@@ -285,7 +285,7 @@ fun PathNavigationBar(
                     Icon(Icons.Default.Folder, contentDescription = null)
                 },
                 placeholder = {
-                    Text("输入设备路径，例如: /sdcard/", style = MaterialTheme.typography.bodySmall)
+                    Text(StringResources.get("file.manager.path.placeholder"), style = MaterialTheme.typography.bodySmall)
                 },
                 textStyle = MaterialTheme.typography.bodyMedium,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -307,7 +307,7 @@ fun PathNavigationBar(
                 enabled = !isExecuting && isPathValid && editablePath.isNotBlank(),
                 modifier = Modifier.height(48.dp).width(80.dp)
             ) {
-                Text("跳转")
+                Text(StringResources.get("file.manager.navigate"))
             }
         }
 
@@ -353,22 +353,22 @@ fun FileListContent(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "名称",
+                        text = StringResources.get("file.manager.name"),
                         modifier = Modifier.weight(2f),
                         style = MaterialTheme.typography.labelMedium
                     )
                     Text(
-                        text = "大小",
+                        text = StringResources.get("file.manager.size"),
                         modifier = Modifier.width(80.dp),
                         style = MaterialTheme.typography.labelMedium
                     )
                     Text(
-                        text = "权限",
+                        text = StringResources.get("file.manager.permissions"),
                         modifier = Modifier.width(100.dp),
                         style = MaterialTheme.typography.labelMedium
                     )
                     Text(
-                        text = "修改时间",
+                        text = StringResources.get("file.manager.modified.time"),
                         modifier = Modifier.width(120.dp),
                         style = MaterialTheme.typography.labelMedium
                     )
