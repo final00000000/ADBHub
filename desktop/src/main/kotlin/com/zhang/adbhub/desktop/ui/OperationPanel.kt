@@ -46,25 +46,25 @@ fun OperationPanel(
             Tab(
                 selected = selectedTab == OperationTab.DEVICE_COMMANDS,
                 onClick = { onTabSelected(OperationTab.DEVICE_COMMANDS) },
-                text = { Text("设备操作", style = MaterialTheme.typography.labelLarge) },
+                text = { Text(StringResources.get("operation.device.commands"), style = MaterialTheme.typography.labelLarge) },
                 icon = { Icon(Icons.Default.PhoneAndroid, contentDescription = null, modifier = Modifier.size(20.dp)) }
             )
             Tab(
                 selected = selectedTab == OperationTab.APP_MANAGEMENT,
                 onClick = { onTabSelected(OperationTab.APP_MANAGEMENT) },
-                text = { Text("应用管理", style = MaterialTheme.typography.labelLarge) },
+                text = { Text(StringResources.get("operation.app.management"), style = MaterialTheme.typography.labelLarge) },
                 icon = { Icon(Icons.Default.Apps, contentDescription = null, modifier = Modifier.size(20.dp)) }
             )
             Tab(
                 selected = selectedTab == OperationTab.FILE_MANAGER,
                 onClick = { onTabSelected(OperationTab.FILE_MANAGER) },
-                text = { Text("文件管理", style = MaterialTheme.typography.labelLarge) },
+                text = { Text(StringResources.get("file.manager.title"), style = MaterialTheme.typography.labelLarge) },
                 icon = { Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(20.dp)) }
             )
             Tab(
                 selected = selectedTab == OperationTab.LOGS,
                 onClick = { onTabSelected(OperationTab.LOGS) },
-                text = { Text("日志管理", style = MaterialTheme.typography.labelLarge) },
+                text = { Text(StringResources.get("operation.log.management"), style = MaterialTheme.typography.labelLarge) },
                 icon = { Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null, modifier = Modifier.size(20.dp)) }
             )
         }
@@ -106,20 +106,20 @@ fun PushApkPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "推送 APK 到设备",
+            text = StringResources.get("operation.push.title"),
             style = MaterialTheme.typography.titleMedium
         )
 
         if (selectedDevice == null) {
             Text(
-                text = "请先选择一个设备",
+                text = StringResources.get("operation.select.device.first"),
                 color = MaterialTheme.colorScheme.error
             )
             return
         }
 
         Text(
-            text = "目标设备: ${selectedDevice.model ?: selectedDevice.serialNumber}",
+            text = StringResources.get("operation.target.device", selectedDevice.model ?: selectedDevice.serialNumber),
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -130,12 +130,12 @@ fun PushApkPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "选择的 APK:",
+                    text = StringResources.get("operation.selected.apk"),
                     style = MaterialTheme.typography.labelMedium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = selectedFile?.absolutePath ?: "未选择文件",
+                    text = selectedFile?.absolutePath ?: StringResources.get("operation.no.file.selected"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
@@ -145,7 +145,7 @@ fun PushApkPanel(selectedDevice: Device?, viewModel: MainViewModel) {
 
         Button(
             onClick = {
-                val dialog = FileDialog(Frame(), "选择 APK 文件", FileDialog.LOAD)
+                val dialog = FileDialog(Frame(), StringResources.get("operation.select.apk"), FileDialog.LOAD)
                 dialog.file = "*.apk"
                 dialog.isVisible = true
                 val file = dialog.file
@@ -157,20 +157,20 @@ fun PushApkPanel(selectedDevice: Device?, viewModel: MainViewModel) {
             enabled = !isExecuting,
             modifier = Modifier.fillMaxWidth().height(48.dp)
         ) {
-            Text("选择 APK 文件")
+            Text(StringResources.get("operation.select.apk"))
         }
 
         // 目标路径输入
         Text(
-            text = "目标路径:",
+            text = StringResources.get("operation.target.path"),
             style = MaterialTheme.typography.labelMedium
         )
 
         OutlinedTextField(
             value = targetPath,
             onValueChange = { targetPath = it },
-            label = { Text("设备上的目标路径") },
-            placeholder = { Text("例如: /system/app/") },
+            label = { Text(StringResources.get("operation.device.path")) },
+            placeholder = { Text(StringResources.get("operation.path.example")) },
             modifier = Modifier.fillMaxWidth().height(64.dp),
             singleLine = true,
             enabled = !isExecuting
@@ -178,7 +178,7 @@ fun PushApkPanel(selectedDevice: Device?, viewModel: MainViewModel) {
 
         // 常用路径快捷选择
         Text(
-            text = "常用路径:",
+            text = StringResources.get("operation.common.paths"),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -241,10 +241,10 @@ fun PushApkPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                         modifier = Modifier.size(16.dp),
                         strokeWidth = 2.dp
                     )
-                    Text("推送中...")
+                    Text(StringResources.get("operation.pushing"))
                 }
             } else {
-                Text("推送到设备")
+                Text(StringResources.get("operation.push.to.device"))
             }
         }
 
@@ -261,7 +261,7 @@ fun PushApkPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                 )
             } else {
                 Text(
-                    text = "等待执行...",
+                    text = StringResources.get("operation.waiting"),
                     modifier = Modifier.padding(16.dp),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -278,20 +278,20 @@ fun LogManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "日志管理",
+            text = StringResources.get("operation.log.management"),
             style = MaterialTheme.typography.titleMedium
         )
 
         if (selectedDevice == null) {
             Text(
-                text = "请先选择一个设备",
+                text = StringResources.get("operation.select.device.first"),
                 color = MaterialTheme.colorScheme.error
             )
             return
         }
 
         Text(
-            text = "日志查看和导出功能在右侧面板中",
+            text = StringResources.get("operation.log.view.hint"),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -309,20 +309,20 @@ fun DeviceCommandsPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "设备操作命令",
+            text = StringResources.get("operation.device.commands"),
             style = MaterialTheme.typography.titleMedium
         )
 
         if (selectedDevice == null) {
             Text(
-                text = "请先选择一个设备",
+                text = StringResources.get("operation.select.device.first"),
                 color = MaterialTheme.colorScheme.error
             )
             return
         }
 
         Text(
-            text = "目标设备: ${selectedDevice.model ?: selectedDevice.serialNumber}",
+            text = StringResources.get("operation.target.device", selectedDevice.model ?: selectedDevice.serialNumber),
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -335,12 +335,12 @@ fun DeviceCommandsPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Root 权限",
+                    text = StringResources.get("operation.root.permission"),
                     style = MaterialTheme.typography.titleSmall
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "以 root 权限重启 ADB 守护进程",
+                    text = StringResources.get("operation.root.description"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -363,10 +363,10 @@ fun DeviceCommandsPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                                 modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp
                             )
-                            Text("执行中...")
+                            Text(StringResources.get("operation.executing"))
                         }
                     } else {
-                        Text("执行 adb root")
+                        Text(StringResources.get("operation.execute.root"))
                     }
                 }
             }
@@ -379,12 +379,12 @@ fun DeviceCommandsPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "重新挂载分区",
+                    text = StringResources.get("operation.remount.title"),
                     style = MaterialTheme.typography.titleSmall
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "将系统分区重新挂载为可写模式",
+                    text = StringResources.get("operation.remount.description"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -407,10 +407,10 @@ fun DeviceCommandsPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                                 modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp
                             )
-                            Text("执行中...")
+                            Text(StringResources.get("operation.executing"))
                         }
                     } else {
-                        Text("执行 adb remount")
+                        Text(StringResources.get("operation.execute.remount"))
                     }
                 }
             }
@@ -423,7 +423,7 @@ fun DeviceCommandsPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "设备重启",
+                    text = StringResources.get("operation.device.reboot"),
                     style = MaterialTheme.typography.titleSmall
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -439,7 +439,7 @@ fun DeviceCommandsPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                         enabled = !isExecuting,
                         modifier = Modifier.height(40.dp)
                     ) {
-                        Text("重启设备")
+                        Text(StringResources.get("operation.reboot"))
                     }
                     Button(
                         onClick = {
@@ -486,7 +486,7 @@ fun DeviceCommandsPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                     )
                 } else {
                     Text(
-                        text = "等待执行...",
+                        text = StringResources.get("operation.waiting"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -509,20 +509,20 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "应用管理",
+            text = StringResources.get("operation.app.management"),
             style = MaterialTheme.typography.titleMedium
         )
 
         if (selectedDevice == null) {
             Text(
-                text = "请先选择一个设备",
+                text = StringResources.get("operation.select.device.first"),
                 color = MaterialTheme.colorScheme.error
             )
             return
         }
 
         Text(
-            text = "目标设备: ${selectedDevice.model ?: selectedDevice.serialNumber}",
+            text = StringResources.get("operation.target.device", selectedDevice.model ?: selectedDevice.serialNumber),
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -532,8 +532,8 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         OutlinedTextField(
             value = packageName,
             onValueChange = { packageName = it },
-            label = { Text("应用包名") },
-            placeholder = { Text("例如: com.example.app") },
+            label = { Text(StringResources.get("operation.package.name")) },
+            placeholder = { Text(StringResources.get("operation.package.example")) },
             modifier = Modifier.fillMaxWidth().height(64.dp),
             singleLine = true
         )
@@ -545,15 +545,15 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "启动应用",
+                    text = StringResources.get("operation.start.app"),
                     style = MaterialTheme.typography.titleSmall
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = activityName,
                     onValueChange = { activityName = it },
-                    label = { Text("Activity 名称") },
-                    placeholder = { Text("例如: .MainActivity") },
+                    label = { Text(StringResources.get("operation.activity.name")) },
+                    placeholder = { Text(StringResources.get("operation.activity.example")) },
                     modifier = Modifier.fillMaxWidth().height(64.dp),
                     singleLine = true,
                     enabled = !isExecuting
@@ -581,10 +581,10 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                                 modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp
                             )
-                            Text("执行中...")
+                            Text(StringResources.get("operation.executing"))
                         }
                     } else {
-                        Text("启动应用")
+                        Text(StringResources.get("operation.start.app"))
                     }
                 }
             }
@@ -703,7 +703,7 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                         )
                     } else {
                         Text(
-                            text = "等待执行...",
+                            text = StringResources.get("operation.waiting"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
