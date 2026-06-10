@@ -223,7 +223,7 @@ fun SettingsDialog(
 
                 // Bottom Buttons
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
