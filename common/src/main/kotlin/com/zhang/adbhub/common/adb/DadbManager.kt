@@ -296,7 +296,7 @@ class DadbManager : AdbManager {
                 AdbResult.Error(StringResources.get("common.adb.reboot.recovery.failed", ${error.ifEmpty { output }}")
             }
         } catch (e: Exception) {
-            AdbResult.Error("执行重启到 Recovery 失败: ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.execute.reboot.recovery.failed", ${e.message}", e)
         }
     }
 
@@ -312,12 +312,12 @@ class DadbManager : AdbManager {
             val exitCode = process.waitFor()
 
             if (exitCode == 0) {
-                AdbResult.Success("设备重启到 Bootloader 模式命令已发送")
+                AdbResult.Success(StringResources.get("common.adb.reboot.bootloader.sent"))
             } else {
-                AdbResult.Error("重启到 Bootloader 失败: ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.reboot.bootloader.failed", ${error.ifEmpty { output }}")
             }
         } catch (e: Exception) {
-            AdbResult.Error("执行重启到 Bootloader 失败: ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.execute.reboot.bootloader.failed", ${e.message}", e)
         }
     }
 
@@ -337,12 +337,12 @@ class DadbManager : AdbManager {
                 val exitCode = process.waitFor()
 
                 if (exitCode == 0) {
-                    AdbResult.Success(output.ifEmpty { "应用启动成功" })
+                    AdbResult.Success(output.ifEmpty { StringResources.get("common.adb.app.start.success") })
                 } else {
-                    AdbResult.Error("启动应用失败: ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.app.start.failed", ${error.ifEmpty { output }}")
                 }
             } catch (e: Exception) {
-                AdbResult.Error("执行启动应用失败: ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.execute.app.start.failed", ${e.message}", e)
             }
         }
 
@@ -363,10 +363,10 @@ class DadbManager : AdbManager {
                 if (exitCode == 0) {
                     AdbResult.Success(output)
                 } else {
-                    AdbResult.Error("获取应用信息失败: ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.app.info.failed", ${error.ifEmpty { output }}")
                 }
             } catch (e: Exception) {
-                AdbResult.Error("执行获取应用信息失败: ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.execute.app.info.failed", ${e.message}", e)
             }
         }
 
@@ -385,12 +385,12 @@ class DadbManager : AdbManager {
                 val exitCode = process.waitFor()
 
                 if (exitCode == 0) {
-                    AdbResult.Success("应用已停止")
+                    AdbResult.Success(StringResources.get("common.adb.app.stop.success"))
                 } else {
-                    AdbResult.Error("停止应用失败: ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.app.stop.failed", ${error.ifEmpty { output }}")
                 }
             } catch (e: Exception) {
-                AdbResult.Error("执行停止应用失败: ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.execute.app.stop.failed", ${e.message}", e)
             }
         }
 
@@ -409,12 +409,12 @@ class DadbManager : AdbManager {
                 val exitCode = process.waitFor()
 
                 if (exitCode == 0) {
-                    AdbResult.Success(output.ifEmpty { "应用数据已清除" })
+                    AdbResult.Success(output.ifEmpty { StringResources.get("common.adb.app.clear.success") })
                 } else {
-                    AdbResult.Error("清除应用数据失败: ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.app.clear.failed", ${error.ifEmpty { output }}")
                 }
             } catch (e: Exception) {
-                AdbResult.Error("执行清除应用数据失败: ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.execute.app.clear.failed", ${e.message}", e)
             }
         }
 
@@ -433,7 +433,7 @@ class DadbManager : AdbManager {
                 val exitCode = process.waitFor()
 
                 if (exitCode != 0) {
-                    return@withContext AdbResult.Error("列出文件失败: ${error.ifEmpty { output }}")
+                    return@withContext AdbResult.Error(StringResources.get("common.adb.list.files.failed", ${error.ifEmpty { output }}")
                 }
 
                 val files = output.lines()
@@ -444,7 +444,7 @@ class DadbManager : AdbManager {
 
                 AdbResult.Success(files)
             } catch (e: Exception) {
-                AdbResult.Error("列出文件失败: ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.list.files.failed", ${e.message}", e)
             }
         }
 
@@ -507,10 +507,10 @@ class DadbManager : AdbManager {
                 if (exitCode == 0) {
                     AdbResult.Success("文件下载成功: ${localPath.absolutePath}\n$output")
                 } else {
-                    AdbResult.Error("下载文件失败: ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.pull.failed", ${error.ifEmpty { output }}")
                 }
             } catch (e: Exception) {
-                AdbResult.Error("下载文件失败: ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.pull.failed", ${e.message}", e)
             }
         }
 
@@ -518,7 +518,7 @@ class DadbManager : AdbManager {
         withContext(Dispatchers.IO) {
             try {
                 if (!localFile.exists()) {
-                    return@withContext AdbResult.Error("本地文件不存在: ${localFile.absolutePath}")
+                    return@withContext AdbResult.Error(StringResources.get("common.adb.file.not.exist", localFile.absolutePath))
                 }
 
                 val adbPath = getAdbPath()
@@ -535,10 +535,10 @@ class DadbManager : AdbManager {
                 if (exitCode == 0) {
                     AdbResult.Success("文件上传成功: $remotePath\n$output")
                 } else {
-                    AdbResult.Error("上传文件失败: ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.push.file.failed", ${error.ifEmpty { output }}")
                 }
             } catch (e: Exception) {
-                AdbResult.Error("上传文件失败: ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.push.file.failed", ${e.message}", e)
             }
         }
 
@@ -557,12 +557,12 @@ class DadbManager : AdbManager {
                 val exitCode = process.waitFor()
 
                 if (exitCode == 0) {
-                    AdbResult.Success("文件已删除: $path")
+                    AdbResult.Success(StringResources.get("common.adb.delete.success", path))
                 } else {
-                    AdbResult.Error("删除文件失败: ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.delete.failed", ${error.ifEmpty { output }}")
                 }
             } catch (e: Exception) {
-                AdbResult.Error("删除文件失败: ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.delete.failed", ${e.message}", e)
             }
         }
 }
