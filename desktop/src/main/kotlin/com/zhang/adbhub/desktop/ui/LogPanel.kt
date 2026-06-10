@@ -121,7 +121,7 @@ fun OperationLogView(viewModel: MainViewModel, modifier: Modifier = Modifier) {
 
     Column(modifier = modifier) {
         Text(
-            text = "Operation history",
+            text = StringResources.get("log.panel.operations"),
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(bottom = 8.dp)
         )
@@ -135,7 +135,7 @@ fun OperationLogView(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             if (logs.isEmpty()) {
-                EmptyLogMessage("No operation records")
+                EmptyLogMessage(StringResources.get("log.panel.no.operations"))
             } else {
                 Box(modifier = Modifier.fillMaxSize()) {
                     LazyColumn(
@@ -317,7 +317,7 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, modifier: M
             value = filterText,
             onValueChange = { viewModel.setLogFilter(it) },
             label = { Text(StringResources.get("log.panel.filter")) },
-            placeholder = { Text("Filter visible logs without restarting logcat") },
+            placeholder = { Text(StringResources.get("log.panel.filter.placeholder")) },
             modifier = Modifier.fillMaxWidth().height(64.dp),
             singleLine = true,
             enabled = selectedDevice != null,
