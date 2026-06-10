@@ -3,9 +3,10 @@ package com.zhang.adbhub.common.adb
 import com.zhang.adbhub.common.model.Device
 import com.zhang.adbhub.common.model.DeviceState
 import com.zhang.adbhub.common.model.AdbResult
+import com.zhang.adbhub.common.model.FileInfo
 import com.zhang.adbhub.common.config.AdbConfig
 import com.zhang.adbhub.common.config.AdbPathDetector
-import dadb.Dadb
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -44,10 +45,11 @@ class DadbManager : AdbManager {
             }
 
             val devices = output.lines()
-                .drop(1) // Skip "List of devices attached"
-                .filter { it.isNotBlank() && it.contains("\t") }
+                .drop(1)
+                .filter { it.isNotBlank() && it.split(Regex("\\s+")).size >= 2 }
                 .mapNotNull { line ->
                     val parts = line.split(Regex("\\s+"))
+
                     if (parts.size >= 2) {
                         val serialNumber = parts[0]
                         val state = when (parts[1]) {
@@ -57,7 +59,6 @@ class DadbManager : AdbManager {
                             else -> DeviceState.UNKNOWN
                         }
 
-                        // Extract model from line (format: model:xxx)
                         val modelMatch = "model:(\\S+)".toRegex().find(line)
                         val model = modelMatch?.groupValues?.get(1)
 
@@ -66,7 +67,9 @@ class DadbManager : AdbManager {
                             model = model,
                             state = state
                         )
-                    } else null
+                    } else {
+                        null
+                    }
                 }
 
             AdbResult.Success(devices)
@@ -75,7 +78,7 @@ class DadbManager : AdbManager {
         }
     }
 
-    override suspend fun pushApk(device: Device, apkFile: File): AdbResult<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun pushApk(device: Device, apkFile: File, targetPath: String): AdbResult<Unit> = withContext(Dispatchers.IO) {
         try {
             if (!apkFile.exists()) {
                 return@withContext AdbResult.Error("APK file not found: ${apkFile.absolutePath}")
@@ -84,18 +87,19 @@ class DadbManager : AdbManager {
             val adbPath = getAdbPath()
                 ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
 
-            // Use adb command directly for install
+            // Use adb push command to push APK to device
             val processBuilder = ProcessBuilder(
-                adbPath, "-s", device.serialNumber, "install", "-r", apkFile.absolutePath
+                adbPath, "-s", device.serialNumber, "push", apkFile.absolutePath, targetPath
             )
             val process = processBuilder.start()
+            val output = process.inputStream.bufferedReader().use { it.readText() }
+            val error = process.errorStream.bufferedReader().use { it.readText() }
             val exitCode = process.waitFor()
 
             if (exitCode == 0) {
                 AdbResult.Success(Unit)
             } else {
-                val error = process.errorStream.bufferedReader().use { it.readText() }
-                AdbResult.Error("Failed to install APK: $error")
+                AdbResult.Error("Failed to push APK: ${error.ifEmpty { output }}")
             }
         } catch (e: Exception) {
             AdbResult.Error("Failed to push APK: ${e.message}", e)
@@ -103,6 +107,7 @@ class DadbManager : AdbManager {
     }
 
     override fun getLogcatFlow(device: Device): Flow<String> = flow {
+        var process: Process? = null
         try {
             val adbPath = getAdbPath()
             if (adbPath == null) {
@@ -111,53 +116,104 @@ class DadbManager : AdbManager {
             }
 
             val processBuilder = ProcessBuilder(
-                adbPath, "-s", device.serialNumber, "logcat"
-            )
-            val process = processBuilder.start()
-            logcatProcesses[device.serialNumber] = process
+                adbPath, "-s", device.serialNumber, "logcat", "-T", "100", "-v", "threadtime"
+            ).redirectErrorStream(true)
+            val startedProcess = processBuilder.start()
+            process = startedProcess
+            logcatProcesses.put(device.serialNumber, startedProcess)?.let { previousProcess ->
+                stopProcess(previousProcess)
+            }
 
-            process.inputStream.bufferedReader().use { reader ->
+            startedProcess.inputStream.bufferedReader().use { reader ->
                 reader.lineSequence().forEach { line ->
                     emit(line)
                 }
             }
+            val exitCode = startedProcess.waitFor()
+            if (exitCode != 0) {
+                emit("logcat exited with code $exitCode")
+            }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             emit("Error: ${e.message}")
         } finally {
-            logcatProcesses.remove(device.serialNumber)
+            process?.let { startedProcess ->
+                logcatProcesses.remove(device.serialNumber, startedProcess)
+                stopProcess(startedProcess)
+            }
         }
     }.flowOn(Dispatchers.IO)
 
     override fun stopLogcat(device: Device) {
-        logcatProcesses[device.serialNumber]?.destroy()
-        logcatProcesses.remove(device.serialNumber)
+        logcatProcesses.remove(device.serialNumber)?.let(::stopProcess)
     }
 
-    override suspend fun exportLogs(device: Device, outputFile: File, maxLines: Int): AdbResult<Unit> =
+    private fun stopProcess(process: Process) {
+        process.destroy()
+        if (process.isAlive) {
+            process.destroyForcibly()
+        }
+    }
+
+    override suspend fun exportLogs(device: Device, outputFolder: File): AdbResult<String> =
         withContext(Dispatchers.IO) {
             try {
                 val adbPath = getAdbPath()
                     ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
 
-                val processBuilder = ProcessBuilder(
-                    adbPath, "-s", device.serialNumber, "logcat", "-d", "-t", maxLines.toString()
-                )
-                val process = processBuilder.start()
-                val logOutput = process.inputStream.bufferedReader().use { it.readText() }
-                val exitCode = process.waitFor()
+                val config = AdbConfig.load()
+                val deviceLogPath = config.deviceLogPath ?: "/sdcard/"
 
-                if (exitCode != 0) {
-                    val error = process.errorStream.bufferedReader().use { it.readText() }
-                    return@withContext AdbResult.Error("导出日志失败: $error")
+                // 确保输出文件夹存在
+                if (!outputFolder.exists()) {
+                    outputFolder.mkdirs()
                 }
 
-                outputFile.writeText(logOutput)
+                val processBuilder = ProcessBuilder(
+                    adbPath, "-s", device.serialNumber, "pull", deviceLogPath, outputFolder.absolutePath
+                )
+                val process = processBuilder.start()
+                val output = process.inputStream.bufferedReader().use { it.readText() }
+                val error = process.errorStream.bufferedReader().use { it.readText() }
+                val exitCode = process.waitFor()
 
-                AdbResult.Success(Unit)
+                if (exitCode == 0) {
+                    AdbResult.Success("日志文件夹导出成功: ${outputFolder.absolutePath}\n$output")
+                } else {
+                    AdbResult.Error("导出日志失败: ${error.ifEmpty { output }}")
+                }
             } catch (e: Exception) {
                 AdbResult.Error("Failed to export logs: ${e.message}", e)
             }
         }
+
+    override suspend fun clearDeviceLogs(device: Device): AdbResult<String> = withContext(Dispatchers.IO) {
+        try {
+            val adbPath = getAdbPath()
+                ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+
+            val config = AdbConfig.load()
+            val deviceLogPath = config.deviceLogPath ?: "/sdcard/"
+            val clearPath = if (deviceLogPath.endsWith("/")) "${deviceLogPath}*" else "$deviceLogPath/*"
+
+            val processBuilder = ProcessBuilder(
+                adbPath, "-s", device.serialNumber, "shell", "rm", "-rf", clearPath
+            )
+            val process = processBuilder.start()
+            val output = process.inputStream.bufferedReader().use { it.readText() }
+            val error = process.errorStream.bufferedReader().use { it.readText() }
+            val exitCode = process.waitFor()
+
+            if (exitCode == 0) {
+                AdbResult.Success("设备日志已清空")
+            } else {
+                AdbResult.Error("清空设备日志失败: ${error.ifEmpty { output }}")
+            }
+        } catch (e: Exception) {
+            AdbResult.Error("执行清空设备日志失败: ${e.message}", e)
+        }
+    }
 
     override suspend fun executeRoot(device: Device): AdbResult<String> = withContext(Dispatchers.IO) {
         try {
@@ -358,6 +414,154 @@ class DadbManager : AdbManager {
                 }
             } catch (e: Exception) {
                 AdbResult.Error("执行清除应用数据失败: ${e.message}", e)
+            }
+        }
+
+    override suspend fun listFiles(device: Device, path: String): AdbResult<List<FileInfo>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val adbPath = getAdbPath()
+                    ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+
+                val processBuilder = ProcessBuilder(
+                    adbPath, "-s", device.serialNumber, "shell", "ls", "-la", path
+                )
+                val process = processBuilder.start()
+                val output = process.inputStream.bufferedReader().use { it.readText() }
+                val error = process.errorStream.bufferedReader().use { it.readText() }
+                val exitCode = process.waitFor()
+
+                if (exitCode != 0) {
+                    return@withContext AdbResult.Error("列出文件失败: ${error.ifEmpty { output }}")
+                }
+
+                val files = output.lines()
+                    .filter { it.isNotBlank() && !it.startsWith("total") }
+                    .mapNotNull { line ->
+                        parseFileInfo(line, path)
+                    }
+
+                AdbResult.Success(files)
+            } catch (e: Exception) {
+                AdbResult.Error("列出文件失败: ${e.message}", e)
+            }
+        }
+
+    /**
+     * 解析 ls -la 输出的单行
+     * 示例: drwxrwxr-x 2 root root 4096 2024-06-09 10:30 folder
+     */
+    private fun parseFileInfo(line: String, basePath: String): FileInfo? {
+        try {
+            val parts = line.split(Regex("\\s+"))
+            if (parts.size < 9) return null
+
+            val permissions = parts[0]
+            val isDirectory = permissions.startsWith("d")
+            val size = parts[4].toLongOrNull() ?: 0
+
+            // 文件名可能包含空格，所以从第8个元素开始拼接
+            val name = parts.drop(8).joinToString(" ")
+            if (name == "." || name == "..") return null
+
+            // 时间格式: parts[5] parts[6] parts[7] 例如: 2024-06-09 10:30
+            val modifiedTime = "${parts[5]} ${parts[6]}"
+
+            val fullPath = if (basePath.endsWith("/")) {
+                "$basePath$name"
+            } else {
+                "$basePath/$name"
+            }
+
+            return FileInfo(
+                name = name,
+                isDirectory = isDirectory,
+                size = size,
+                permissions = permissions,
+                modifiedTime = modifiedTime,
+                fullPath = fullPath
+            )
+        } catch (e: Exception) {
+            return null
+        }
+    }
+
+    override suspend fun pullFile(device: Device, remotePath: String, localPath: File): AdbResult<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                val adbPath = getAdbPath()
+                    ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+
+                // 确保本地目录存在
+                localPath.parentFile?.mkdirs()
+
+                val processBuilder = ProcessBuilder(
+                    adbPath, "-s", device.serialNumber, "pull", remotePath, localPath.absolutePath
+                )
+                val process = processBuilder.start()
+                val output = process.inputStream.bufferedReader().use { it.readText() }
+                val error = process.errorStream.bufferedReader().use { it.readText() }
+                val exitCode = process.waitFor()
+
+                if (exitCode == 0) {
+                    AdbResult.Success("文件下载成功: ${localPath.absolutePath}\n$output")
+                } else {
+                    AdbResult.Error("下载文件失败: ${error.ifEmpty { output }}")
+                }
+            } catch (e: Exception) {
+                AdbResult.Error("下载文件失败: ${e.message}", e)
+            }
+        }
+
+    override suspend fun pushFile(device: Device, localFile: File, remotePath: String): AdbResult<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                if (!localFile.exists()) {
+                    return@withContext AdbResult.Error("本地文件不存在: ${localFile.absolutePath}")
+                }
+
+                val adbPath = getAdbPath()
+                    ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+
+                val processBuilder = ProcessBuilder(
+                    adbPath, "-s", device.serialNumber, "push", localFile.absolutePath, remotePath
+                )
+                val process = processBuilder.start()
+                val output = process.inputStream.bufferedReader().use { it.readText() }
+                val error = process.errorStream.bufferedReader().use { it.readText() }
+                val exitCode = process.waitFor()
+
+                if (exitCode == 0) {
+                    AdbResult.Success("文件上传成功: $remotePath\n$output")
+                } else {
+                    AdbResult.Error("上传文件失败: ${error.ifEmpty { output }}")
+                }
+            } catch (e: Exception) {
+                AdbResult.Error("上传文件失败: ${e.message}", e)
+            }
+        }
+
+    override suspend fun deleteFile(device: Device, path: String): AdbResult<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                val adbPath = getAdbPath()
+                    ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+
+                val processBuilder = ProcessBuilder(
+                    adbPath, "-s", device.serialNumber, "shell", "rm", "-rf", path
+                )
+                val process = processBuilder.start()
+                val output = process.inputStream.bufferedReader().use { it.readText() }
+                val error = process.errorStream.bufferedReader().use { it.readText() }
+                val exitCode = process.waitFor()
+
+                if (exitCode == 0) {
+                    AdbResult.Success("文件已删除: $path")
+                } else {
+                    AdbResult.Error("删除文件失败: ${error.ifEmpty { output }}")
+                }
+            } catch (e: Exception) {
+                AdbResult.Error("删除文件失败: ${e.message}", e)
             }
         }
 }

@@ -20,6 +20,7 @@ fun SettingsDialog(
 ) {
     val viewModel = remember { SettingsViewModel() }
     val customAdbPath by viewModel.customAdbPath.collectAsState()
+    val deviceLogPath by viewModel.deviceLogPath.collectAsState()
     val adbVersion by viewModel.adbVersion.collectAsState()
     val detectedPaths by viewModel.detectedPaths.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
@@ -94,14 +95,14 @@ fun SettingsDialog(
                     )
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(64.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         OutlinedTextField(
                             value = customAdbPath,
                             onValueChange = { viewModel.setCustomPath(it) },
                             label = { Text("ADB 可执行文件路径") },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
                             singleLine = true
                         )
 
@@ -115,7 +116,7 @@ fun SettingsDialog(
                                     viewModel.setCustomPath(File(directory, file).absolutePath)
                                 }
                             },
-                            modifier = Modifier.align(Alignment.CenterVertically)
+                            modifier = Modifier.align(Alignment.CenterVertically).height(48.dp)
                         ) {
                             Text("浏览")
                         }
@@ -123,6 +124,29 @@ fun SettingsDialog(
 
                     Text(
                         text = "留空则自动检测系统中的 ADB",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                    )
+
+                    // Device Log Path
+                    Text(
+                        text = "设备日志路径",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = deviceLogPath,
+                        onValueChange = { viewModel.setDeviceLogPath(it) },
+                        label = { Text("设备上的日志目录路径") },
+                        placeholder = { Text("例如: /data/logs/ 或 /sdcard/logs/") },
+                        modifier = Modifier.fillMaxWidth().height(64.dp),
+                        singleLine = true
+                    )
+
+                    Text(
+                        text = "留空则使用默认路径 /sdcard/（通用 Android 路径）",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
@@ -160,57 +184,62 @@ fun SettingsDialog(
                         }
                     }
 
-                    // Action Buttons
+                    // Action Buttons - 增加高度并移除固定height，让按钮自适应
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         OutlinedButton(
                             onClick = { viewModel.testConnection() },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).height(56.dp)
                         ) {
-                            Text("测试连接")
+                            Text("测试 ADB", style = MaterialTheme.typography.bodyLarge)
                         }
 
                         OutlinedButton(
                             onClick = { viewModel.resetToDefault() },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).height(56.dp)
                         ) {
-                            Text("重置为默认")
+                            Text("重置默认", style = MaterialTheme.typography.bodyLarge)
                         }
                     }
 
                     // Status Message
-                    statusMessage?.let { message ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Text(
-                                text = message,
-                                modifier = Modifier.padding(12.dp),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
+                    Card(
+                        modifier = Modifier.fillMaxWidth().height(80.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Text(
+                            text = statusMessage ?: " ",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 3
+                        )
                     }
                 }
 
                 // Bottom Buttons
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 16.dp),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.height(40.dp)
+                    ) {
                         Text("取消")
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = {
-                        viewModel.saveConfig()
-                        onDismiss()
-                    }) {
+                    Button(
+                        onClick = {
+                            viewModel.saveConfig()
+                            onDismiss()
+                        },
+                        modifier = Modifier.height(40.dp)
+                    ) {
                         Text("保存")
                     }
                 }

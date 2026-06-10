@@ -7,9 +7,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.zhang.adbhub.common.config.AdbPathDetector
 import com.zhang.adbhub.desktop.viewmodel.SettingsViewModel
 import java.awt.FileDialog
 import java.awt.Frame
@@ -24,6 +24,9 @@ fun AdbSetupGuideDialog(
     val detectedPaths by viewModel.detectedPaths.collectAsState()
     val customAdbPath by viewModel.customAdbPath.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
+    val possibleAdbPaths = remember {
+        AdbPathDetector.detectPossiblePathCandidates().map { it.displayPath }
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -184,16 +187,13 @@ fun AdbSetupGuideDialog(
                             )
 
                             Text(
-                                text = "常见路径：",
+                                text = "当前系统会自动尝试：",
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
 
                             Text(
-                                text = "• Windows: %LOCALAPPDATA%\\Android\\Sdk\\platform-tools\\adb.exe\n" +
-                                        "• Windows: C:\\Android\\Sdk\\platform-tools\\adb.exe\n" +
-                                        "• macOS: ~/Library/Android/sdk/platform-tools/adb\n" +
-                                        "• Linux: ~/Android/Sdk/platform-tools/adb",
+                                text = possibleAdbPaths.joinToString("\n") { path -> "• $path" },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(start = 8.dp, bottom = 12.dp)

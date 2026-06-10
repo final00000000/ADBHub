@@ -196,3 +196,16 @@ ai-context.md
 # AI 辅助的本地配置
 .ai-config.json
 .llm-config.json
+
+# Project-local agent workflow and setup files
+AGENTS.md
+.trellis/
+.agents/
+.codex/
+.git-hooks/
+.idea/
+.git-skip-worktree.md
+GLOBAL-INSTALL-GUIDE.md
+install-global.ps1
+setup-hooks.ps1
+test-adb-detection.kt

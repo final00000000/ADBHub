@@ -2,6 +2,11 @@ package com.zhang.adbhub.common.config
 
 import java.io.File
 
+data class AdbPathCandidate(
+    val path: String,
+    val displayPath: String
+)
+
 /**
  * ADB 路径检测器
  */
@@ -36,39 +41,66 @@ object AdbPathDetector {
     /**
      * 检测可能的 ADB 路径（按优先级排序）
      */
-    fun detectPossiblePaths(): List<String> {
-        val paths = mutableListOf<String>()
+    fun detectPossiblePathCandidates(): List<AdbPathCandidate> {
+        val candidates = mutableListOf<AdbPathCandidate>()
 
         // 1. 系统 PATH 中的 adb
-        paths.add("adb")
+        candidates.add(
+            AdbPathCandidate(
+                path = "adb",
+                displayPath = "系统 PATH: adb"
+            )
+        )
 
         // 2. Windows 常见路径
         if (isWindows()) {
             val localAppData = System.getenv("LOCALAPPDATA")
             if (localAppData != null) {
-                paths.add("$localAppData\\Android\\Sdk\\platform-tools\\adb.exe")
+                candidates.add(
+                    AdbPathCandidate(
+                        path = "$localAppData\\Android\\Sdk\\platform-tools\\adb.exe",
+                        displayPath = "%LOCALAPPDATA%\\Android\\Sdk\\platform-tools\\adb.exe"
+                    )
+                )
             }
-            paths.add("C:\\Android\\Sdk\\platform-tools\\adb.exe")
-            paths.add("E:\\AndroidSDK\\platform-tools\\adb.exe")
-            paths.add("D:\\Android\\Sdk\\platform-tools\\adb.exe")
+
+            // 自动搜索所有盘符
+            candidates.addAll(searchWindowsDrives())
         }
 
         // 3. macOS 常见路径
         if (isMac()) {
             val userHome = System.getProperty("user.home")
-            paths.add("$userHome/Library/Android/sdk/platform-tools/adb")
-            paths.add("/usr/local/bin/adb")
+            candidates.add(
+                AdbPathCandidate(
+                    path = "$userHome/Library/Android/sdk/platform-tools/adb",
+                    displayPath = "~/Library/Android/sdk/platform-tools/adb"
+                )
+            )
+            candidates.add(AdbPathCandidate("/usr/local/bin/adb", "/usr/local/bin/adb"))
         }
 
         // 4. Linux 常见路径
         if (isLinux()) {
             val userHome = System.getProperty("user.home")
-            paths.add("$userHome/Android/Sdk/platform-tools/adb")
-            paths.add("/usr/bin/adb")
-            paths.add("/usr/local/bin/adb")
+            candidates.add(
+                AdbPathCandidate(
+                    path = "$userHome/Android/Sdk/platform-tools/adb",
+                    displayPath = "~/Android/Sdk/platform-tools/adb"
+                )
+            )
+            candidates.add(AdbPathCandidate("/usr/bin/adb", "/usr/bin/adb"))
+            candidates.add(AdbPathCandidate("/usr/local/bin/adb", "/usr/local/bin/adb"))
         }
 
-        return paths
+        return candidates
+    }
+
+    /**
+     * 检测可能的 ADB 路径（按优先级排序）
+     */
+    fun detectPossiblePaths(): List<String> {
+        return detectPossiblePathCandidates().map { it.path }
     }
 
     /**
@@ -92,7 +124,8 @@ object AdbPathDetector {
     fun getValidAdbPath(customPath: String?): String? {
         // 1. 尝试用户自定义路径
         if (!customPath.isNullOrBlank()) {
-            if (File(customPath).exists() && isAdbAvailable(customPath)) {
+            val file = File(customPath)
+            if (file.exists() && isAdbAvailable(customPath)) {
                 return customPath
             }
         }
@@ -112,5 +145,35 @@ object AdbPathDetector {
 
     private fun isLinux(): Boolean {
         return System.getProperty("os.name").lowercase().contains("linux")
+    }
+
+    /**
+     * 搜索 Windows 所有盘符下的 Android SDK
+     */
+    private fun searchWindowsDrives(): List<AdbPathCandidate> {
+        val candidates = mutableListOf<AdbPathCandidate>()
+        val roots = File.listRoots()
+
+        for (root in roots) {
+            val paths = listOf(
+                "Android\\Sdk\\platform-tools\\adb.exe",
+                "AndroidSDK\\platform-tools\\adb.exe",
+                "SDK\\Android\\platform-tools\\adb.exe"
+            )
+
+            for (path in paths) {
+                val fullPath = File(root, path)
+                if (fullPath.exists()) {
+                    candidates.add(
+                        AdbPathCandidate(
+                            path = fullPath.absolutePath,
+                            displayPath = fullPath.absolutePath
+                        )
+                    )
+                }
+            }
+        }
+
+        return candidates
     }
 }

@@ -40,28 +40,14 @@ fun MainScreen() {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // TopAppBar with settings button
-        TopAppBar(
-            title = { Text("ADB Hub") },
-            actions = {
-                IconButton(onClick = { showSettingsDialog = true }) {
-                    Icon(Icons.Default.Settings, contentDescription = "设置")
-                }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        )
-
-        Row(modifier = Modifier.fillMaxSize()) {
+    Row(modifier = Modifier.fillMaxSize()) {
             // 左栏：设备列表
             DeviceListPanel(
                 devices = devices,
                 selectedDevice = selectedDevice,
                 onDeviceSelected = { viewModel.selectDevice(it) },
                 onRefresh = { viewModel.refreshDevices() },
+                onSettingsClick = { showSettingsDialog = true },
                 adbStatus = adbStatus,
                 modifier = Modifier.width(250.dp).fillMaxHeight()
             )
@@ -86,7 +72,6 @@ fun MainScreen() {
                 modifier = Modifier.width(450.dp).fillMaxHeight()
             )
         }
-    }
 
     // Dialogs
     if (showSettingsDialog) {

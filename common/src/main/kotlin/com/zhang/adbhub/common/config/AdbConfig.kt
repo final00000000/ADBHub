@@ -12,7 +12,9 @@ import java.io.File
 @Serializable
 data class AdbConfig(
     val customAdbPath: String? = null,
-    val lastUsedAdbPath: String? = null
+    val lastUsedAdbPath: String? = null,
+    val deviceLogPath: String? = null,
+    val pushTargetPath: String? = null
 ) {
     companion object {
         private val json = Json {
@@ -38,7 +40,6 @@ data class AdbConfig(
                     AdbConfig()
                 }
             } catch (e: Exception) {
-                println("Failed to load config: ${e.message}")
                 AdbConfig()
             }
         }
@@ -51,7 +52,7 @@ data class AdbConfig(
                 val content = json.encodeToString(config)
                 configFile.writeText(content)
             } catch (e: Exception) {
-                println("Failed to save config: ${e.message}")
+                // Silently fail - config save is not critical
             }
         }
     }

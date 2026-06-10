@@ -11,6 +11,9 @@ class SettingsViewModel {
     private val _customAdbPath = MutableStateFlow("")
     val customAdbPath: StateFlow<String> = _customAdbPath.asStateFlow()
 
+    private val _deviceLogPath = MutableStateFlow("")
+    val deviceLogPath: StateFlow<String> = _deviceLogPath.asStateFlow()
+
     private val _adbVersion = MutableStateFlow<String?>(null)
     val adbVersion: StateFlow<String?> = _adbVersion.asStateFlow()
 
@@ -32,6 +35,7 @@ class SettingsViewModel {
     private fun loadConfig() {
         val config = AdbConfig.load()
         _customAdbPath.value = config.customAdbPath ?: ""
+        _deviceLogPath.value = config.deviceLogPath ?: ""
     }
 
     private fun detectPaths() {
@@ -66,9 +70,14 @@ class SettingsViewModel {
         _customAdbPath.value = path
     }
 
+    fun setDeviceLogPath(path: String) {
+        _deviceLogPath.value = path
+    }
+
     fun saveConfig() {
         val config = AdbConfig(
-            customAdbPath = _customAdbPath.value.takeIf { it.isNotBlank() }
+            customAdbPath = _customAdbPath.value.takeIf { it.isNotBlank() },
+            deviceLogPath = _deviceLogPath.value.takeIf { it.isNotBlank() }
         )
         AdbConfig.save(config)
         checkCurrentAdb()
