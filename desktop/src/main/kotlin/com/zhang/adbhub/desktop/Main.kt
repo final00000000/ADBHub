@@ -10,11 +10,12 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.zhang.adbhub.desktop.ui.MainScreen
+import com.zhang.adbhub.desktop.utils.StringResources
 
 fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
-        title = "ADB Hub - 车机调试工具",
+        title = "${StringResources.get("app.title")} - ${StringResources.get("app.subtitle")}",
         state = rememberWindowState(width = 1200.dp, height = 800.dp)
     ) {
         MaterialTheme {

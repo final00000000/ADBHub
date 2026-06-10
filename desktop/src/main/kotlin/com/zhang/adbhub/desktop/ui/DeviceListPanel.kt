@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.zhang.adbhub.common.model.Device
+import com.zhang.adbhub.desktop.utils.StringResources
 
 @Composable
 fun DeviceListPanel(
@@ -29,7 +30,7 @@ fun DeviceListPanel(
     Column(modifier = modifier.padding(16.dp)) {
         // 标题
         Text(
-            text = "已连接设备",
+            text = StringResources.get("device.list.title"),
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -42,11 +43,11 @@ fun DeviceListPanel(
         ) {
             Icon(
                 Icons.Default.Refresh,
-                contentDescription = "刷新设备",
+                contentDescription = StringResources.get("device.list.refresh"),
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text("刷新设备列表")
+            Text(StringResources.get("device.list.refresh.button"))
         }
 
         Spacer(modifier = Modifier.height(8.dp))
