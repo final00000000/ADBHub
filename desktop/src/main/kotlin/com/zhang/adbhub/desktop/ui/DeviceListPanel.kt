@@ -85,7 +85,7 @@ fun DeviceListPanel(
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             if (devices.isEmpty()) {
                 Text(
-                    text = "未检测到设备\n\n请确保：\n• ADB 已安装\n• 设备已连接\n• USB 调试已开启",
+                    text = StringResources.get("device.list.no.device"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp)
@@ -112,7 +112,7 @@ fun DeviceListPanel(
         ) {
             Icon(Icons.Default.Settings, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("设置")
+            Text(StringResources.get("device.list.settings"))
         }
     }
 }
