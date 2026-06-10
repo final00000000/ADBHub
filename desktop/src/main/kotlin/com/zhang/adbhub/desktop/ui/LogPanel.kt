@@ -387,7 +387,7 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, modifier: M
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             when {
-                selectedDevice == null -> EmptyLogMessage("Select a device first")
+                selectedDevice == null -> EmptyLogMessage(StringResources.get("log.panel.select.device"))
                 logLines.isEmpty() -> {
                     EmptyLogMessage(
                         if (isLogcatRunning) {
