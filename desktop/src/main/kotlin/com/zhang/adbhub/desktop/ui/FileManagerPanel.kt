@@ -45,20 +45,20 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = StringResources.get("file_manager.title"),
+            text = StringResources.get("file.manager.title"),
             style = MaterialTheme.typography.titleMedium
         )
 
         if (selectedDevice == null) {
             Text(
-                text = StringResources.get("file_manager.select_device_first"),
+                text = StringResources.get("file.manager.select_device_first"),
                 color = MaterialTheme.colorScheme.error
             )
             return
         }
 
         Text(
-            text = StringResources.get("file_manager.target_device", selectedDevice.model ?: selectedDevice.serialNumber),
+            text = StringResources.get("file.manager.target_device", selectedDevice.model ?: selectedDevice.serialNumber),
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -81,7 +81,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         ) {
             Button(
                 onClick = {
-                    val dialog = FileDialog(Frame(), StringResources.get("file_manager.select_file_upload"), FileDialog.LOAD)
+                    val dialog = FileDialog(Frame(), StringResources.get("file.manager.select_file_upload"), FileDialog.LOAD)
                     dialog.isVisible = true
                     val file = dialog.file
                     val dir = dialog.directory
@@ -102,20 +102,20 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
             ) {
                 Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(StringResources.get("file_manager.upload_file"))
+                Text(StringResources.get("file.manager.upload_file"))
             }
 
             Button(
                 onClick = {
                     viewModel.navigateToPath(currentPath)
-                    resultText = StringResources.get("file_manager.directory_refreshed")
+                    resultText = StringResources.get("file.manager.directory_refreshed")
                 },
                 enabled = !isExecuting,
                 modifier = Modifier.weight(1f).fillMaxHeight()
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(StringResources.get("file_manager.refresh"))
+                Text(StringResources.get("file.manager.refresh"))
             }
         }
 
@@ -132,7 +132,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                         )
                     } else {
                     Text(
-                        text = StringResources.get("file_manager.directory_empty_or_inaccessible"),
+                        text = StringResources.get("file.manager.directory_empty_or_inaccessible"),
                         modifier = Modifier.align(Alignment.Center).padding(16.dp),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -147,7 +147,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                             resultText = ""
                         },
                         onDownload = { fileInfo ->
-                            val dialog = FileDialog(Frame(), StringResources.get("file_manager.save_file"), FileDialog.SAVE)
+                            val dialog = FileDialog(Frame(), StringResources.get("file.manager.save_file"), FileDialog.SAVE)
                             dialog.file = fileInfo.name
                             dialog.isVisible = true
                             val file = dialog.file
@@ -176,7 +176,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = StringResources.get("file_manager.operation_result"),
+                    text = StringResources.get("file.manager.operation_result"),
                     style = MaterialTheme.typography.titleSmall
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -187,7 +187,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                     )
                 } else {
                     Text(
-                        text = StringResources.get("file_manager.waiting_for_operation"),
+                        text = StringResources.get("file.manager.waiting_for_operation"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -200,9 +200,9 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
     if (showDeleteDialog && fileToDelete != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text(StringResources.get("file_manager.confirm_delete")) },
+            title = { Text(StringResources.get("file.manager.confirm_delete")) },
             text = {
-                Text(StringResources.get("file_manager.delete_confirmation_message", fileToDelete!!.name, if (fileToDelete!!.isDirectory) StringResources.get("file_manager.delete_directory_warning") else ""))
+                Text(StringResources.get("file.manager.delete_confirmation_message", fileToDelete!!.name, if (fileToDelete!!.isDirectory) StringResources.get("file.manager.delete_directory_warning") else ""))
             },
             confirmButton = {
                 Button(
@@ -219,7 +219,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                         containerColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text(StringResources.get("file_manager.delete"))
+                    Text(StringResources.get("file.manager.delete"))
                 }
             },
             dismissButton = {
@@ -227,7 +227,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                     showDeleteDialog = false
                     fileToDelete = null
                 }) {
-                    Text(StringResources.get("file_manager.cancel"))
+                    Text(StringResources.get("file.manager.cancel"))
                 }
             }
         )

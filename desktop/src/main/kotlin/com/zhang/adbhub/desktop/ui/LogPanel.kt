@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zhang.adbhub.common.model.Device
 import com.zhang.adbhub.desktop.viewmodel.MainViewModel
+import com.zhang.adbhub.desktop.utils.StringResources
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
@@ -75,7 +76,7 @@ fun LogPanel(
             Tab(
                 selected = selectedLogTab == 0,
                 onClick = { selectedLogTab = 0 },
-                text = { Text("Operations", style = MaterialTheme.typography.labelLarge) },
+                text = { Text(StringResources.get("log.panel.operations"), style = MaterialTheme.typography.labelLarge) },
                 icon = {
                     Icon(
                         Icons.AutoMirrored.Filled.List,
@@ -87,7 +88,7 @@ fun LogPanel(
             Tab(
                 selected = selectedLogTab == 1,
                 onClick = { selectedLogTab = 1 },
-                text = { Text("Device log", style = MaterialTheme.typography.labelLarge) },
+                text = { Text(StringResources.get("log.panel.device.log"), style = MaterialTheme.typography.labelLarge) },
                 icon = {
                     Icon(
                         Icons.Default.PhoneAndroid,
@@ -249,7 +250,7 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, modifier: M
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Logcat stream",
+                text = StringResources.get("log.panel.logcat.stream"),
                 style = MaterialTheme.typography.titleSmall
             )
             Row {
@@ -315,7 +316,7 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, modifier: M
         OutlinedTextField(
             value = filterText,
             onValueChange = { viewModel.setLogFilter(it) },
-            label = { Text("Filter") },
+            label = { Text(StringResources.get("log.panel.filter")) },
             placeholder = { Text("Filter visible logs without restarting logcat") },
             modifier = Modifier.fillMaxWidth().height(64.dp),
             singleLine = true,
