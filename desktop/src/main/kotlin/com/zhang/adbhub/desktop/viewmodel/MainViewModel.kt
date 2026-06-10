@@ -5,6 +5,7 @@ import com.zhang.adbhub.common.adb.DadbManager
 import com.zhang.adbhub.common.model.AdbResult
 import com.zhang.adbhub.common.model.Device
 import com.zhang.adbhub.common.model.FileInfo
+import com.zhang.adbhub.desktop.utils.StringResources
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.File
