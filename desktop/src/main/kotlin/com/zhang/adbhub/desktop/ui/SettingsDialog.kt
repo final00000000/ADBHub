@@ -55,7 +55,7 @@ fun SettingsDialog(
 
                 Column(
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(1f, fill = false)
                         .verticalScroll(rememberScrollState())
                 ) {
                     // ADB Status
