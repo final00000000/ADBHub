@@ -459,7 +459,7 @@ class MainViewModel {
         }
     }
 
-    // 文件管理方法
+    // File management methods
     fun navigateToPath(path: String) {
         val device = _selectedDevice.value ?: return
         scope.launch {
