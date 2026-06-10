@@ -342,7 +342,7 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, modifier: M
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Start log stream")
+                    Text(StringResources.get("log.panel.start.stream"))
                 }
             } else {
                 Button(
@@ -354,7 +354,7 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, modifier: M
                 ) {
                     Icon(Icons.Default.Stop, contentDescription = null)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Stop log stream")
+                    Text(StringResources.get("log.panel.stop.stream"))
                 }
             }
         }
@@ -367,9 +367,9 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, modifier: M
         ) {
             Text(
                 text = if (isLogcatRunning) {
-                    "Streaming - ${logLines.size} visible lines"
+                    StringResources.get("log.panel.streaming.lines", logLines.size)
                 } else {
-                    "Stopped - ${logLines.size} visible lines"
+                    StringResources.get("log.panel.stopped.lines", logLines.size)
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

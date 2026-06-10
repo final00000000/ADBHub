@@ -51,14 +51,14 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
 
         if (selectedDevice == null) {
             Text(
-                text = StringResources.get("file.manager.select_device_first"),
+                text = StringResources.get("file.manager.select.device.first"),
                 color = MaterialTheme.colorScheme.error
             )
             return
         }
 
         Text(
-            text = StringResources.get("file.manager.target_device", selectedDevice.model ?: selectedDevice.serialNumber),
+            text = StringResources.get("file.manager.target.device", selectedDevice.model ?: selectedDevice.serialNumber),
             style = MaterialTheme.typography.bodyMedium
         )
 
