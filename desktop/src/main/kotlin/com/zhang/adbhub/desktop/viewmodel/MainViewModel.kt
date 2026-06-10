@@ -76,11 +76,11 @@ class MainViewModel {
             val adbPath = com.zhang.adbhub.common.config.AdbPathDetector.getValidAdbPath(config.customAdbPath)
 
             if (adbPath == null) {
-                _adbStatus.value = "ADB 未找到"
+                _adbStatus.value = StringResources.get("status.adb.not.found")
                 _devices.value = emptyList()
                 return@launch
             } else {
-                _adbStatus.value = "ADB 已找到: $adbPath"
+                _adbStatus.value = StringResources.get("status.adb.found", adbPath)
             }
 
             when (val result = adbManager.getDevices()) {
@@ -90,13 +90,13 @@ class MainViewModel {
                         _selectedDevice.value = result.data.first()
                     }
                     if (result.data.isEmpty()) {
-                        _statusMessage.value = "ADB 正常，但未检测到设备。请检查设备连接和 USB 调试。"
+                        _statusMessage.value = StringResources.get("status.no.device.connected")
                     } else {
                         _statusMessage.value = null
                     }
                 }
                 is AdbResult.Error -> {
-                    _statusMessage.value = "获取设备失败: ${result.message}"
+                    _statusMessage.value = StringResources.get("status.get.devices.failed", result.message)
                 }
             }
         }
@@ -124,10 +124,10 @@ class MainViewModel {
         scope.launch {
             _isExecuting.value = true
             val command = "adb -s ${device.serialNumber} push ${apkFile.absolutePath} $targetPath"
-            addOperationLog("推送 APK", command, null, false)
+            addOperationLog(StringResources.get("operation.push.apk"), command, null, false)
 
             try {
-                onProgress("正在推送 APK...")
+                onProgress(StringResources.get("operation.pushing"))
                 when (val result = adbManager.pushApk(device, apkFile, targetPath)) {
                     is AdbResult.Success -> {
                         // Save the target path for next use
@@ -135,14 +135,14 @@ class MainViewModel {
                         val newConfig = config.copy(pushTargetPath = targetPath)
                         com.zhang.adbhub.common.config.AdbConfig.save(newConfig)
 
-                        addOperationLog("推送 APK 成功", command, "APK 已推送到 $targetPath", true)
-                        onProgress("APK 推送成功 ✓")
-                        _statusMessage.value = "APK 推送成功"
+                        addOperationLog(StringResources.get("operation.push.apk"), command, "APK 已推送到 $targetPath", true)
+                        onProgress("${StringResources.get("operation.push.success")} ✓")
+                        _statusMessage.value = StringResources.get("operation.push.success")
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("推送 APK 失败", command, result.message, false)
-                        onProgress("推送失败 ✗: ${result.message}")
-                        _statusMessage.value = "推送失败: ${result.message}"
+                        addOperationLog(StringResources.get("operation.push.apk"), command, result.message, false)
+                        onProgress("${StringResources.get("operation.push.failed", result.message)} ✗")
+                        _statusMessage.value = StringResources.get("operation.push.failed", result.message)
                     }
                 }
             } finally {
