@@ -136,7 +136,7 @@ class MainViewModel {
                         val newConfig = config.copy(pushTargetPath = targetPath)
                         com.zhang.adbhub.common.config.AdbConfig.save(newConfig)
 
-                        addOperationLog(StringResources.get("operation.push.apk"), command, "APK 已推送到 $targetPath", true)
+                        addOperationLog(StringResources.get("operation.push.apk"), command, StringResources.get("operation.push.apk.success", targetPath), true)
                         onProgress("${StringResources.get("operation.push.success")} ✓")
                         _statusMessage.value = StringResources.get("operation.push.success")
                     }
@@ -208,12 +208,12 @@ class MainViewModel {
             try {
                 when (val result = adbManager.exportLogs(device, outputFolder)) {
                     is AdbResult.Success -> {
-                        addOperationLog("导出设备日志", command, result.data, true)
-                        onResult("日志导出成功 ✓: ${outputFolder.absolutePath}")
+                        addOperationLog(StringResources.get("operation.log.export.device.log"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.export.success", outputFolder.absolutePath))
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("导出设备日志", command, result.message, false)
-                        onResult("导出失败 ✗: ${result.message}")
+                        addOperationLog(StringResources.get("operation.log.export.device.log"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.export.failed", result.message))
                     }
                 }
             } finally {
@@ -234,12 +234,12 @@ class MainViewModel {
             try {
                 when (val result = adbManager.clearDeviceLogs(device)) {
                     is AdbResult.Success -> {
-                        addOperationLog("清空设备日志", command, result.data, true)
-                        onResult("成功 ✓: ${result.data}")
+                        addOperationLog(StringResources.get("operation.log.clear.device.log"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.success", result.data))
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("清空设备日志", command, result.message, false)
-                        onResult("失败 ✗: ${result.message}")
+                        addOperationLog(StringResources.get("operation.log.clear.device.log"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
                     }
                 }
             } finally {
@@ -261,12 +261,12 @@ class MainViewModel {
             try {
                 when (val result = adbManager.executeRoot(device)) {
                     is AdbResult.Success -> {
-                        addOperationLog("执行 Root 命令", command, result.data, true)
-                        onResult("成功 ✓: ${result.data}")
+                        addOperationLog(StringResources.get("operation.log.execute.root"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.success", result.data))
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("执行 Root 命令", command, result.message, false)
-                        onResult("失败 ✗: ${result.message}")
+                        addOperationLog(StringResources.get("operation.log.execute.root"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
                     }
                 }
             } finally {
@@ -284,12 +284,12 @@ class MainViewModel {
             try {
                 when (val result = adbManager.executeRemount(device)) {
                     is AdbResult.Success -> {
-                        addOperationLog("执行 Remount 命令", command, result.data, true)
-                        onResult("成功 ✓: ${result.data}")
+                        addOperationLog(StringResources.get("operation.log.execute.remount"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.success", result.data))
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("执行 Remount 命令", command, result.message, false)
-                        onResult("失败 ✗: ${result.message}")
+                        addOperationLog(StringResources.get("operation.log.execute.remount"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
                     }
                 }
             } finally {
@@ -307,12 +307,12 @@ class MainViewModel {
             try {
                 when (val result = adbManager.rebootDevice(device)) {
                     is AdbResult.Success -> {
-                        addOperationLog("重启设备", command, result.data, true)
-                        onResult("成功 ✓: ${result.data}")
+                        addOperationLog(StringResources.get("operation.log.reboot.device"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.success", result.data))
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("重启设备", command, result.message, false)
-                        onResult("失败 ✗: ${result.message}")
+                        addOperationLog(StringResources.get("operation.log.reboot.device"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
                     }
                 }
             } finally {
@@ -330,12 +330,12 @@ class MainViewModel {
             try {
                 when (val result = adbManager.rebootRecovery(device)) {
                     is AdbResult.Success -> {
-                        addOperationLog("重启到 Recovery", command, result.data, true)
-                        onResult("成功 ✓: ${result.data}")
+                        addOperationLog(StringResources.get("operation.log.reboot.recovery"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.success", result.data))
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("重启到 Recovery", command, result.message, false)
-                        onResult("失败 ✗: ${result.message}")
+                        addOperationLog(StringResources.get("operation.log.reboot.recovery"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
                     }
                 }
             } finally {
@@ -353,12 +353,12 @@ class MainViewModel {
             try {
                 when (val result = adbManager.rebootBootloader(device)) {
                     is AdbResult.Success -> {
-                        addOperationLog("重启到 Bootloader", command, result.data, true)
-                        onResult("成功 ✓: ${result.data}")
+                        addOperationLog(StringResources.get("operation.log.reboot.bootloader"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.success", result.data))
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("重启到 Bootloader", command, result.message, false)
-                        onResult("失败 ✗: ${result.message}")
+                        addOperationLog(StringResources.get("operation.log.reboot.bootloader"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
                     }
                 }
             } finally {
@@ -376,12 +376,12 @@ class MainViewModel {
             try {
                 when (val result = adbManager.startApp(device, packageName, activityName)) {
                     is AdbResult.Success -> {
-                        addOperationLog("启动应用", command, result.data, true)
-                        onResult("成功 ✓: ${result.data}")
+                        addOperationLog(StringResources.get("operation.log.start.app"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.success", result.data))
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("启动应用", command, result.message, false)
-                        onResult("失败 ✗: ${result.message}")
+                        addOperationLog(StringResources.get("operation.log.start.app"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
                     }
                 }
             } finally {
@@ -399,12 +399,12 @@ class MainViewModel {
             try {
                 when (val result = adbManager.getAppInfo(device, packageName)) {
                     is AdbResult.Success -> {
-                        addOperationLog("获取应用信息", command, "信息获取成功", true)
+                        addOperationLog(StringResources.get("operation.log.get.app.info"), command, StringResources.get("operation.log.get.app.info.success"), true)
                         onResult(result.data)
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("获取应用信息", command, result.message, false)
-                        onResult("失败 ✗: ${result.message}")
+                        addOperationLog(StringResources.get("operation.log.get.app.info"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
                     }
                 }
             } finally {
@@ -422,12 +422,12 @@ class MainViewModel {
             try {
                 when (val result = adbManager.stopApp(device, packageName)) {
                     is AdbResult.Success -> {
-                        addOperationLog("停止应用", command, result.data, true)
-                        onResult("成功 ✓: ${result.data}")
+                        addOperationLog(StringResources.get("operation.log.stop.app"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.success", result.data))
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("停止应用", command, result.message, false)
-                        onResult("失败 ✗: ${result.message}")
+                        addOperationLog(StringResources.get("operation.log.stop.app"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
                     }
                 }
             } finally {
@@ -445,12 +445,12 @@ class MainViewModel {
             try {
                 when (val result = adbManager.clearAppData(device, packageName)) {
                     is AdbResult.Success -> {
-                        addOperationLog("清除应用数据", command, result.data, true)
-                        onResult("成功 ✓: ${result.data}")
+                        addOperationLog(StringResources.get("operation.log.clear.app.data"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.success", result.data))
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("清除应用数据", command, result.message, false)
-                        onResult("失败 ✗: ${result.message}")
+                        addOperationLog(StringResources.get("operation.log.clear.app.data"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
                     }
                 }
             } finally {
@@ -471,11 +471,11 @@ class MainViewModel {
                     is AdbResult.Success -> {
                         _currentPath.value = path
                         _fileList.value = result.data
-                        addOperationLog("浏览目录", command, "成功列出 ${result.data.size} 个项目", true)
+                        addOperationLog(StringResources.get("operation.log.browse.directory"), command, StringResources.get("operation.log.browse.success", result.data.size), true)
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("浏览目录", command, result.message, false)
-                        _statusMessage.value = "浏览目录失败: ${result.message}"
+                        addOperationLog(StringResources.get("operation.log.browse.directory"), command, result.message, false)
+                        _statusMessage.value = StringResources.get("operation.log.failed", result.message)
                     }
                 }
             } finally {
@@ -491,11 +491,11 @@ class MainViewModel {
         when (val result = adbManager.listFiles(device, path)) {
             is AdbResult.Success -> {
                 _fileList.value = result.data
-                addOperationLog("刷新目录", command, "Listed ${result.data.size} item(s)", true)
+                addOperationLog(StringResources.get("operation.log.refresh.directory"), command, "Listed ${result.data.size} item(s)", true)
             }
             is AdbResult.Error -> {
-                addOperationLog("刷新目录", command, result.message, false)
-                _statusMessage.value = "刷新目录失败: ${result.message}"
+                addOperationLog(StringResources.get("operation.log.refresh.directory"), command, result.message, false)
+                _statusMessage.value = StringResources.get("operation.log.failed", result.message)
             }
         }
     }
@@ -509,12 +509,12 @@ class MainViewModel {
             try {
                 when (val result = adbManager.pullFile(device, remotePath, localPath)) {
                     is AdbResult.Success -> {
-                        addOperationLog("下载文件", command, result.data, true)
-                        onResult("成功 ✓: ${result.data}")
+                        addOperationLog(StringResources.get("operation.log.download.file"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.success", result.data))
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("下载文件", command, result.message, false)
-                        onResult("失败 ✗: ${result.message}")
+                        addOperationLog(StringResources.get("operation.log.download.file"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
                     }
                 }
             } finally {
@@ -532,14 +532,14 @@ class MainViewModel {
             try {
                 when (val result = adbManager.pushFile(device, localFile, remotePath)) {
                     is AdbResult.Success -> {
-                        addOperationLog("上传文件", command, result.data, true)
-                        onResult("成功 ✓: ${result.data}")
+                        addOperationLog(StringResources.get("operation.log.upload.file"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.success", result.data))
                         // 刷新当前目录
                         refreshCurrentPath(device)
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("上传文件", command, result.message, false)
-                        onResult("失败 ✗: ${result.message}")
+                        addOperationLog(StringResources.get("operation.log.upload.file"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
                     }
                 }
             } finally {
@@ -557,14 +557,14 @@ class MainViewModel {
             try {
                 when (val result = adbManager.deleteFile(device, path)) {
                     is AdbResult.Success -> {
-                        addOperationLog("删除文件", command, result.data, true)
-                        onResult("成功 ✓: ${result.data}")
+                        addOperationLog(StringResources.get("operation.log.delete.file"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.success", result.data))
                         // 刷新当前目录
                         refreshCurrentPath(device)
                     }
                     is AdbResult.Error -> {
-                        addOperationLog("删除文件", command, result.message, false)
-                        onResult("失败 ✗: ${result.message}")
+                        addOperationLog(StringResources.get("operation.log.delete.file"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
                     }
                 }
             } finally {
