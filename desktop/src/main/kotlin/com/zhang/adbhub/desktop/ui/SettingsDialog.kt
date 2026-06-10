@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.zhang.adbhub.desktop.viewmodel.SettingsViewModel
+import com.zhang.adbhub.desktop.utils.StringResources
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
@@ -36,7 +37,7 @@ fun SettingsDialog(
         Surface(
             modifier = Modifier
                 .width(600.dp)
-                .heightIn(max = 700.dp),
+                .heightIn(min = 600.dp, max = 800.dp),
             shape = MaterialTheme.shapes.large,
             tonalElevation = 8.dp
         ) {
@@ -47,7 +48,7 @@ fun SettingsDialog(
             ) {
                 // Title
                 Text(
-                    text = "ADB 设置",
+                    text = StringResources.get("settings.title"),
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
@@ -69,7 +70,7 @@ fun SettingsDialog(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = if (isAdbAvailable) "ADB 状态：已连接" else "ADB 状态：未连接",
+                                text = if (isAdbAvailable) StringResources.get("settings.adb.status.connected") else StringResources.get("settings.adb.status.disconnected"),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = if (isAdbAvailable)
                                     MaterialTheme.colorScheme.onPrimaryContainer
@@ -78,7 +79,7 @@ fun SettingsDialog(
                             )
                             if (adbVersion != null) {
                                 Text(
-                                    text = "版本: $adbVersion",
+                                    text = StringResources.get("settings.version.label", adbVersion!!),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.padding(top = 4.dp)
@@ -89,7 +90,7 @@ fun SettingsDialog(
 
                     // Custom ADB Path
                     Text(
-                        text = "自定义 ADB 路径",
+                        text = StringResources.get("settings.custom.adb.path"),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
@@ -101,14 +102,14 @@ fun SettingsDialog(
                         OutlinedTextField(
                             value = customAdbPath,
                             onValueChange = { viewModel.setCustomPath(it) },
-                            label = { Text("ADB 可执行文件路径") },
+                            label = { Text(StringResources.get("settings.adb.path.label")) },
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                             singleLine = true
                         )
 
                         Button(
                             onClick = {
-                                val fileDialog = FileDialog(null as Frame?, "选择 ADB 可执行文件", FileDialog.LOAD)
+                                val fileDialog = FileDialog(null as Frame?, StringResources.get("settings.choose.adb"), FileDialog.LOAD)
                                 fileDialog.isVisible = true
                                 val directory = fileDialog.directory
                                 val file = fileDialog.file
@@ -118,12 +119,12 @@ fun SettingsDialog(
                             },
                             modifier = Modifier.align(Alignment.CenterVertically).height(48.dp)
                         ) {
-                            Text("浏览")
+                            Text(StringResources.get("settings.browse"))
                         }
                     }
 
                     Text(
-                        text = "留空则自动检测系统中的 ADB",
+                        text = StringResources.get("settings.auto.detect.hint"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
@@ -131,7 +132,7 @@ fun SettingsDialog(
 
                     // Device Log Path
                     Text(
-                        text = "设备日志路径",
+                        text = StringResources.get("settings.device.log.path"),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
@@ -139,14 +140,14 @@ fun SettingsDialog(
                     OutlinedTextField(
                         value = deviceLogPath,
                         onValueChange = { viewModel.setDeviceLogPath(it) },
-                        label = { Text("设备上的日志目录路径") },
-                        placeholder = { Text("例如: /data/logs/ 或 /sdcard/logs/") },
+                        label = { Text(StringResources.get("settings.device.log.path.label")) },
+                        placeholder = { Text(StringResources.get("settings.device.log.path.placeholder")) },
                         modifier = Modifier.fillMaxWidth().height(64.dp),
                         singleLine = true
                     )
 
                     Text(
-                        text = "留空则使用默认路径 /sdcard/（通用 Android 路径）",
+                        text = StringResources.get("settings.device.log.path.hint"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
@@ -155,7 +156,7 @@ fun SettingsDialog(
                     // Detected Paths
                     if (detectedPaths.isNotEmpty()) {
                         Text(
-                            text = "检测到的 ADB 路径",
+                            text = StringResources.get("settings.detected.paths"),
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
@@ -176,7 +177,7 @@ fun SettingsDialog(
                                             modifier = Modifier.weight(1f)
                                         )
                                         TextButton(onClick = { viewModel.setCustomPath(path) }) {
-                                            Text("使用")
+                                            Text(StringResources.get("settings.use"))
                                         }
                                     }
                                 }
@@ -193,14 +194,14 @@ fun SettingsDialog(
                             onClick = { viewModel.testConnection() },
                             modifier = Modifier.weight(1f).height(56.dp)
                         ) {
-                            Text("测试 ADB", style = MaterialTheme.typography.bodyLarge)
+                            Text(StringResources.get("settings.test.adb"), style = MaterialTheme.typography.bodyLarge)
                         }
 
                         OutlinedButton(
                             onClick = { viewModel.resetToDefault() },
                             modifier = Modifier.weight(1f).height(56.dp)
                         ) {
-                            Text("重置默认", style = MaterialTheme.typography.bodyLarge)
+                            Text(StringResources.get("settings.reset.default"), style = MaterialTheme.typography.bodyLarge)
                         }
                     }
 
@@ -230,7 +231,7 @@ fun SettingsDialog(
                         onClick = onDismiss,
                         modifier = Modifier.height(40.dp)
                     ) {
-                        Text("取消")
+                        Text(StringResources.get("settings.cancel"))
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
@@ -240,7 +241,7 @@ fun SettingsDialog(
                         },
                         modifier = Modifier.height(40.dp)
                     ) {
-                        Text("保存")
+                        Text(StringResources.get("settings.save"))
                     }
                 }
             }

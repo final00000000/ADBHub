@@ -2,6 +2,7 @@ package com.zhang.adbhub.desktop.viewmodel
 
 import com.zhang.adbhub.common.config.AdbConfig
 import com.zhang.adbhub.common.config.AdbPathDetector
+import com.zhang.adbhub.desktop.utils.StringResources
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -26,9 +27,11 @@ class SettingsViewModel {
     private val _isAdbAvailable = MutableStateFlow(false)
     val isAdbAvailable: StateFlow<Boolean> = _isAdbAvailable.asStateFlow()
 
+    private val _isScanning = MutableStateFlow(false)
+    val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+
     init {
         loadConfig()
-        detectPaths()
         checkCurrentAdb()
     }
 
@@ -38,17 +41,34 @@ class SettingsViewModel {
         _deviceLogPath.value = config.deviceLogPath ?: ""
     }
 
-    private fun detectPaths() {
+    fun scanAllDrives() {
         scope.launch(Dispatchers.IO) {
-            val paths = AdbPathDetector.detectPossiblePaths()
-            val validPaths = paths.filter { path ->
-                try {
-                    AdbPathDetector.isAdbAvailable(path)
-                } catch (e: Exception) {
-                    false
+            withContext(Dispatchers.Main) {
+                _isScanning.value = true
+                _statusMessage.value = StringResources.get("status.scanning.drives")
+            }
+            try {
+                val paths = AdbPathDetector.detectPossiblePaths()
+                val validPaths = paths.filter { path ->
+                    try {
+                        AdbPathDetector.isAdbAvailable(path)
+                    } catch (e: Exception) {
+                        false
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    _detectedPaths.value = validPaths
+                    _statusMessage.value = if (validPaths.isEmpty()) {
+                        StringResources.get("status.no.adb.found")
+                    } else {
+                        StringResources.get("status.found.paths", validPaths.size)
+                    }
+                }
+            } finally {
+                withContext(Dispatchers.Main) {
+                    _isScanning.value = false
                 }
             }
-            _detectedPaths.value = validPaths
         }
     }
 
@@ -81,7 +101,7 @@ class SettingsViewModel {
         )
         AdbConfig.save(config)
         checkCurrentAdb()
-        _statusMessage.value = "配置已保存"
+        _statusMessage.value = StringResources.get("status.config.saved")
     }
 
     fun testConnection() {
@@ -92,13 +112,13 @@ class SettingsViewModel {
             if (validPath != null) {
                 val version = AdbPathDetector.getAdbVersion(validPath)
                 withContext(Dispatchers.Main) {
-                    _statusMessage.value = "连接成功！\n版本: $version"
+                    _statusMessage.value = StringResources.get("status.connection.success", version ?: "")
                     _isAdbAvailable.value = true
                     _adbVersion.value = version
                 }
             } else {
                 withContext(Dispatchers.Main) {
-                    _statusMessage.value = "连接失败：无法找到有效的 ADB 工具"
+                    _statusMessage.value = StringResources.get("status.connection.failed")
                     _isAdbAvailable.value = false
                     _adbVersion.value = null
                 }
@@ -110,7 +130,7 @@ class SettingsViewModel {
         _customAdbPath.value = ""
         AdbConfig.save(AdbConfig())
         checkCurrentAdb()
-        _statusMessage.value = "已重置为默认配置"
+        _statusMessage.value = StringResources.get("status.reset.success")
     }
 
     fun clearStatusMessage() {

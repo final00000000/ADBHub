@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.zhang.adbhub.common.model.Device
 import com.zhang.adbhub.common.model.FileInfo
 import com.zhang.adbhub.desktop.viewmodel.MainViewModel
+import com.zhang.adbhub.desktop.utils.StringResources
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
@@ -44,20 +45,20 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "文件管理",
+            text = StringResources.get("file_manager.title"),
             style = MaterialTheme.typography.titleMedium
         )
 
         if (selectedDevice == null) {
             Text(
-                text = "请先选择一个设备",
+                text = StringResources.get("file_manager.select_device_first"),
                 color = MaterialTheme.colorScheme.error
             )
             return
         }
 
         Text(
-            text = "目标设备: ${selectedDevice.model ?: selectedDevice.serialNumber}",
+            text = StringResources.get("file_manager.target_device", selectedDevice.model ?: selectedDevice.serialNumber),
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -80,7 +81,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         ) {
             Button(
                 onClick = {
-                    val dialog = FileDialog(Frame(), "选择文件上传", FileDialog.LOAD)
+                    val dialog = FileDialog(Frame(), StringResources.get("file_manager.select_file_upload"), FileDialog.LOAD)
                     dialog.isVisible = true
                     val file = dialog.file
                     val dir = dialog.directory
@@ -101,20 +102,20 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
             ) {
                 Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("上传文件")
+                Text(StringResources.get("file_manager.upload_file"))
             }
 
             Button(
                 onClick = {
                     viewModel.navigateToPath(currentPath)
-                    resultText = "目录已刷新"
+                    resultText = StringResources.get("file_manager.directory_refreshed")
                 },
                 enabled = !isExecuting,
                 modifier = Modifier.weight(1f).fillMaxHeight()
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("刷新")
+                Text(StringResources.get("file_manager.refresh"))
             }
         }
 
@@ -131,7 +132,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                         )
                     } else {
                     Text(
-                        text = "目录为空或无法访问",
+                        text = StringResources.get("file_manager.directory_empty_or_inaccessible"),
                         modifier = Modifier.align(Alignment.Center).padding(16.dp),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -146,7 +147,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                             resultText = ""
                         },
                         onDownload = { fileInfo ->
-                            val dialog = FileDialog(Frame(), "保存文件", FileDialog.SAVE)
+                            val dialog = FileDialog(Frame(), StringResources.get("file_manager.save_file"), FileDialog.SAVE)
                             dialog.file = fileInfo.name
                             dialog.isVisible = true
                             val file = dialog.file
@@ -175,7 +176,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "操作结果",
+                    text = StringResources.get("file_manager.operation_result"),
                     style = MaterialTheme.typography.titleSmall
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -186,7 +187,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                     )
                 } else {
                     Text(
-                        text = "等待操作...",
+                        text = StringResources.get("file_manager.waiting_for_operation"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -199,9 +200,9 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
     if (showDeleteDialog && fileToDelete != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("确认删除") },
+            title = { Text(StringResources.get("file_manager.confirm_delete")) },
             text = {
-                Text("确定要删除 ${fileToDelete!!.name} 吗？\n\n${if (fileToDelete!!.isDirectory) "这将删除整个目录及其内容。" else ""}")
+                Text(StringResources.get("file_manager.delete_confirmation_message", fileToDelete!!.name, if (fileToDelete!!.isDirectory) StringResources.get("file_manager.delete_directory_warning") else ""))
             },
             confirmButton = {
                 Button(
@@ -218,7 +219,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                         containerColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("删除")
+                    Text(StringResources.get("file_manager.delete"))
                 }
             },
             dismissButton = {
@@ -226,7 +227,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                     showDeleteDialog = false
                     fileToDelete = null
                 }) {
-                    Text("取消")
+                    Text(StringResources.get("file_manager.cancel"))
                 }
             }
         )

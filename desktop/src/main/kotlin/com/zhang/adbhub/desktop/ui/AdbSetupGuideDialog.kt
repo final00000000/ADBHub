@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.zhang.adbhub.common.config.AdbPathDetector
 import com.zhang.adbhub.desktop.viewmodel.SettingsViewModel
+import com.zhang.adbhub.desktop.utils.StringResources
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
@@ -24,9 +25,7 @@ fun AdbSetupGuideDialog(
     val detectedPaths by viewModel.detectedPaths.collectAsState()
     val customAdbPath by viewModel.customAdbPath.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
-    val possibleAdbPaths = remember {
-        AdbPathDetector.detectPossiblePathCandidates().map { it.displayPath }
-    }
+    val isScanning by viewModel.isScanning.collectAsState()
 
     DisposableEffect(Unit) {
         onDispose {
@@ -49,14 +48,14 @@ fun AdbSetupGuideDialog(
             ) {
                 // Title
                 Text(
-                    text = "未检测到 ADB 工具",
+                    text = StringResources.get("setup.title"),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
 
                 Text(
-                    text = "ADBHub 需要 Android Debug Bridge (ADB) 工具才能工作。请配置 ADB 路径以继续。",
+                    text = StringResources.get("setup.description"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -67,6 +66,88 @@ fun AdbSetupGuideDialog(
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
                 ) {
+                    // Manual selection section (优先显示)
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = StringResources.get("setup.manual_config"),
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = customAdbPath,
+                                    onValueChange = { viewModel.setCustomPath(it) },
+                                    label = { Text(StringResources.get("setup.adb_path_label")) },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true
+                                )
+
+                                Button(
+                                    onClick = {
+                                        val fileDialog = FileDialog(null as Frame?, StringResources.get("setup.adb_path_label"), FileDialog.LOAD)
+                                        fileDialog.isVisible = true
+                                        val directory = fileDialog.directory
+                                        val file = fileDialog.file
+                                        if (directory != null && file != null) {
+                                            viewModel.setCustomPath(File(directory, file).absolutePath)
+                                        }
+                                    },
+                                    modifier = Modifier.align(Alignment.CenterVertically)
+                                ) {
+                                    Text(StringResources.get("settings.browse"))
+                                }
+                            }
+
+                            if (customAdbPath.isNotBlank()) {
+                                Button(
+                                    onClick = {
+                                        viewModel.saveConfig()
+                                        onAdbConfigured()
+                                    },
+                                    modifier = Modifier.padding(top = 8.dp).fillMaxWidth()
+                                ) {
+                                    Text(StringResources.get("setup.use_path"))
+                                }
+                            }
+                        }
+                    }
+
+                    // Scan button
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = StringResources.get("setup.auto_scan"),
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Text(
+                                text = StringResources.get("setup.scan_description"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                            Button(
+                                onClick = { viewModel.scanAllDrives() },
+                                enabled = !isScanning,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(if (isScanning) StringResources.get("setup.scanning") else StringResources.get("setup.scan_button"))
+                            }
+                        }
+                    }
+
                     // Detected paths section
                     if (detectedPaths.isNotEmpty()) {
                         Card(
@@ -77,7 +158,7 @@ fun AdbSetupGuideDialog(
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
-                                    text = "检测到可能的 ADB 路径",
+                                    text = StringResources.get("setup.detected_paths"),
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.padding(bottom = 8.dp)
@@ -102,65 +183,12 @@ fun AdbSetupGuideDialog(
                                                 onAdbConfigured()
                                             }
                                         ) {
-                                            Text("选择此路径")
+                                            Text(StringResources.get("setup.select_path"))
                                         }
                                     }
                                     if (path != detectedPaths.last()) {
                                         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                                     }
-                                }
-                            }
-                        }
-                    }
-
-                    // Manual selection section
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "手动选择 ADB 路径",
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = customAdbPath,
-                                    onValueChange = { viewModel.setCustomPath(it) },
-                                    label = { Text("ADB 可执行文件路径") },
-                                    modifier = Modifier.weight(1f),
-                                    singleLine = true
-                                )
-
-                                Button(
-                                    onClick = {
-                                        val fileDialog = FileDialog(null as Frame?, "选择 ADB 可执行文件", FileDialog.LOAD)
-                                        fileDialog.isVisible = true
-                                        val directory = fileDialog.directory
-                                        val file = fileDialog.file
-                                        if (directory != null && file != null) {
-                                            viewModel.setCustomPath(File(directory, file).absolutePath)
-                                        }
-                                    },
-                                    modifier = Modifier.align(Alignment.CenterVertically)
-                                ) {
-                                    Text("浏览")
-                                }
-                            }
-
-                            if (customAdbPath.isNotBlank()) {
-                                Button(
-                                    onClick = {
-                                        viewModel.saveConfig()
-                                        onAdbConfigured()
-                                    },
-                                    modifier = Modifier.padding(top = 8.dp).fillMaxWidth()
-                                ) {
-                                    Text("使用此路径")
                                 }
                             }
                         }
@@ -175,33 +203,19 @@ fun AdbSetupGuideDialog(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = "如何安装 ADB",
+                                text = StringResources.get("setup.install_guide"),
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
 
                             Text(
-                                text = "ADB 通常包含在 Android SDK Platform Tools 中。",
+                                text = StringResources.get("setup.install_description"),
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
 
                             Text(
-                                text = "当前系统会自动尝试：",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
-
-                            Text(
-                                text = possibleAdbPaths.joinToString("\n") { path -> "• $path" },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 8.dp, bottom = 12.dp)
-                            )
-
-                            Text(
-                                text = "如果您没有安装 Android SDK，可以从 Google 官网下载 SDK Platform Tools：\n" +
-                                        "https://developer.android.com/studio/releases/platform-tools",
+                                text = StringResources.get("setup.download_guide"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -232,7 +246,7 @@ fun AdbSetupGuideDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("稍后配置")
+                        Text(StringResources.get("setup.later"))
                     }
                 }
             }
