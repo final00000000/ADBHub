@@ -391,9 +391,9 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, modifier: M
                 logLines.isEmpty() -> {
                     EmptyLogMessage(
                         if (isLogcatRunning) {
-                            "Waiting for matching log lines"
+                            StringResources.get("log.panel.waiting.logs")
                         } else {
-                            "Start the log stream"
+                            StringResources.get("log.panel.start.hint")
                         }
                     )
                 }
