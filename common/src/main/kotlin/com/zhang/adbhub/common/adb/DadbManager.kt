@@ -1,4 +1,5 @@
 package com.zhang.adbhub.common.adb
+import com.zhang.adbhub.common.utils.StringResources
 
 import com.zhang.adbhub.common.model.Device
 import com.zhang.adbhub.common.model.DeviceState
@@ -32,7 +33,7 @@ class DadbManager : AdbManager {
     override suspend fun getDevices(): AdbResult<List<Device>> = withContext(Dispatchers.IO) {
         try {
             val adbPath = getAdbPath()
-                ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
             val processBuilder = ProcessBuilder(adbPath, "devices", "-l")
             val process = processBuilder.start()
@@ -41,7 +42,7 @@ class DadbManager : AdbManager {
 
             if (exitCode != 0) {
                 val error = process.errorStream.bufferedReader().use { it.readText() }
-                return@withContext AdbResult.Error("获取设备列表失败: $error")
+                return@withContext AdbResult.Error("获取设备列表失败: $error)
             }
 
             val devices = output.lines()
@@ -85,7 +86,7 @@ class DadbManager : AdbManager {
             }
 
             val adbPath = getAdbPath()
-                ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
             // Use adb push command to push APK to device
             val processBuilder = ProcessBuilder(
@@ -99,10 +100,10 @@ class DadbManager : AdbManager {
             if (exitCode == 0) {
                 AdbResult.Success(Unit)
             } else {
-                AdbResult.Error("Failed to push APK: ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.push.failed", ${error.ifEmpty { output }}")
             }
         } catch (e: Exception) {
-            AdbResult.Error("Failed to push APK: ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.push.failed", ${e.message}", e)
         }
     }
 
@@ -111,7 +112,7 @@ class DadbManager : AdbManager {
         try {
             val adbPath = getAdbPath()
             if (adbPath == null) {
-                emit("错误: 未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                emit(StringResources.get("common.error.prefix") + StringResources.get("common.adb.not.detected"))
                 return@flow
             }
 
@@ -160,7 +161,7 @@ class DadbManager : AdbManager {
         withContext(Dispatchers.IO) {
             try {
                 val adbPath = getAdbPath()
-                    ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                    ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
                 val config = AdbConfig.load()
                 val deviceLogPath = config.deviceLogPath ?: "/sdcard/"
@@ -181,7 +182,7 @@ class DadbManager : AdbManager {
                 if (exitCode == 0) {
                     AdbResult.Success("日志文件夹导出成功: ${outputFolder.absolutePath}\n$output")
                 } else {
-                    AdbResult.Error("导出日志失败: ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.export.failed", ${error.ifEmpty { output }}")
                 }
             } catch (e: Exception) {
                 AdbResult.Error("Failed to export logs: ${e.message}", e)
@@ -191,7 +192,7 @@ class DadbManager : AdbManager {
     override suspend fun clearDeviceLogs(device: Device): AdbResult<String> = withContext(Dispatchers.IO) {
         try {
             val adbPath = getAdbPath()
-                ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
             val config = AdbConfig.load()
             val deviceLogPath = config.deviceLogPath ?: "/sdcard/"
@@ -206,19 +207,19 @@ class DadbManager : AdbManager {
             val exitCode = process.waitFor()
 
             if (exitCode == 0) {
-                AdbResult.Success("设备日志已清空")
+                AdbResult.Success(StringResources.get("common.adb.clear.success"))
             } else {
-                AdbResult.Error("清空设备日志失败: ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.clear.failed", ${error.ifEmpty { output }}")
             }
         } catch (e: Exception) {
-            AdbResult.Error("执行清空设备日志失败: ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.execute.clear.failed", ${e.message}", e)
         }
     }
 
     override suspend fun executeRoot(device: Device): AdbResult<String> = withContext(Dispatchers.IO) {
         try {
             val adbPath = getAdbPath()
-                ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
             val processBuilder = ProcessBuilder(adbPath, "-s", device.serialNumber, "root")
             val process = processBuilder.start()
@@ -227,19 +228,19 @@ class DadbManager : AdbManager {
             val exitCode = process.waitFor()
 
             if (exitCode == 0) {
-                AdbResult.Success(output.ifEmpty { "Root 命令执行成功" })
+                AdbResult.Success(output.ifEmpty { StringResources.get("common.adb.root.success") })
             } else {
-                AdbResult.Error("Root 命令失败: ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.root.failed", ${error.ifEmpty { output }}")
             }
         } catch (e: Exception) {
-            AdbResult.Error("执行 root 命令失败: ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.execute.root.failed", ${e.message}", e)
         }
     }
 
     override suspend fun executeRemount(device: Device): AdbResult<String> = withContext(Dispatchers.IO) {
         try {
             val adbPath = getAdbPath()
-                ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
             val processBuilder = ProcessBuilder(adbPath, "-s", device.serialNumber, "remount")
             val process = processBuilder.start()
@@ -248,19 +249,19 @@ class DadbManager : AdbManager {
             val exitCode = process.waitFor()
 
             if (exitCode == 0) {
-                AdbResult.Success(output.ifEmpty { "Remount 命令执行成功" })
+                AdbResult.Success(output.ifEmpty { StringResources.get("common.adb.remount.success") })
             } else {
-                AdbResult.Error("Remount 命令失败: ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.remount.failed", ${error.ifEmpty { output }}")
             }
         } catch (e: Exception) {
-            AdbResult.Error("执行 remount 命令失败: ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.execute.remount.failed", ${e.message}", e)
         }
     }
 
     override suspend fun rebootDevice(device: Device): AdbResult<String> = withContext(Dispatchers.IO) {
         try {
             val adbPath = getAdbPath()
-                ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
             val processBuilder = ProcessBuilder(adbPath, "-s", device.serialNumber, "reboot")
             val process = processBuilder.start()
@@ -269,19 +270,19 @@ class DadbManager : AdbManager {
             val exitCode = process.waitFor()
 
             if (exitCode == 0) {
-                AdbResult.Success("设备重启命令已发送")
+                AdbResult.Success(StringResources.get("common.adb.reboot.sent"))
             } else {
-                AdbResult.Error("重启命令失败: ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.reboot.failed", ${error.ifEmpty { output }}")
             }
         } catch (e: Exception) {
-            AdbResult.Error("执行重启命令失败: ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.execute.reboot.failed", ${e.message}", e)
         }
     }
 
     override suspend fun rebootRecovery(device: Device): AdbResult<String> = withContext(Dispatchers.IO) {
         try {
             val adbPath = getAdbPath()
-                ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
             val processBuilder = ProcessBuilder(adbPath, "-s", device.serialNumber, "reboot", "recovery")
             val process = processBuilder.start()
@@ -290,9 +291,9 @@ class DadbManager : AdbManager {
             val exitCode = process.waitFor()
 
             if (exitCode == 0) {
-                AdbResult.Success("设备重启到 Recovery 模式命令已发送")
+                AdbResult.Success(StringResources.get("common.adb.reboot.recovery.sent"))
             } else {
-                AdbResult.Error("重启到 Recovery 失败: ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.reboot.recovery.failed", ${error.ifEmpty { output }}")
             }
         } catch (e: Exception) {
             AdbResult.Error("执行重启到 Recovery 失败: ${e.message}", e)
@@ -302,7 +303,7 @@ class DadbManager : AdbManager {
     override suspend fun rebootBootloader(device: Device): AdbResult<String> = withContext(Dispatchers.IO) {
         try {
             val adbPath = getAdbPath()
-                ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
             val processBuilder = ProcessBuilder(adbPath, "-s", device.serialNumber, "reboot", "bootloader")
             val process = processBuilder.start()
@@ -324,7 +325,7 @@ class DadbManager : AdbManager {
         withContext(Dispatchers.IO) {
             try {
                 val adbPath = getAdbPath()
-                    ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                    ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
                 val component = "$packageName/$activityName"
                 val processBuilder = ProcessBuilder(
@@ -349,7 +350,7 @@ class DadbManager : AdbManager {
         withContext(Dispatchers.IO) {
             try {
                 val adbPath = getAdbPath()
-                    ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                    ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
                 val processBuilder = ProcessBuilder(
                     adbPath, "-s", device.serialNumber, "shell", "dumpsys", "package", packageName
@@ -373,7 +374,7 @@ class DadbManager : AdbManager {
         withContext(Dispatchers.IO) {
             try {
                 val adbPath = getAdbPath()
-                    ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                    ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
                 val processBuilder = ProcessBuilder(
                     adbPath, "-s", device.serialNumber, "shell", "am", "force-stop", packageName
@@ -397,7 +398,7 @@ class DadbManager : AdbManager {
         withContext(Dispatchers.IO) {
             try {
                 val adbPath = getAdbPath()
-                    ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                    ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
                 val processBuilder = ProcessBuilder(
                     adbPath, "-s", device.serialNumber, "shell", "pm", "clear", packageName
@@ -421,7 +422,7 @@ class DadbManager : AdbManager {
         withContext(Dispatchers.IO) {
             try {
                 val adbPath = getAdbPath()
-                    ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                    ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
                 val processBuilder = ProcessBuilder(
                     adbPath, "-s", device.serialNumber, "shell", "ls", "-la", path
@@ -490,7 +491,7 @@ class DadbManager : AdbManager {
         withContext(Dispatchers.IO) {
             try {
                 val adbPath = getAdbPath()
-                    ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                    ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
                 // 确保本地目录存在
                 localPath.parentFile?.mkdirs()
@@ -521,7 +522,7 @@ class DadbManager : AdbManager {
                 }
 
                 val adbPath = getAdbPath()
-                    ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                    ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
                 val processBuilder = ProcessBuilder(
                     adbPath, "-s", device.serialNumber, "push", localFile.absolutePath, remotePath
@@ -545,7 +546,7 @@ class DadbManager : AdbManager {
         withContext(Dispatchers.IO) {
             try {
                 val adbPath = getAdbPath()
-                    ?: return@withContext AdbResult.Error("未检测到 ADB 工具，请在设置中配置 ADB 路径")
+                    ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
                 val processBuilder = ProcessBuilder(
                     adbPath, "-s", device.serialNumber, "shell", "rm", "-rf", path
