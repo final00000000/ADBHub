@@ -36,9 +36,13 @@ compose.desktop {
             )
             packageName = "ADBHub"
             packageVersion = "1.0.0"
+            description = "Android Debug Bridge 管理工具"
+            vendor = "ADBHub Team"
 
             windows {
-                iconFile.set(project.file("src/main/resources/icon.ico"))
+                // iconFile.set(project.file("src/main/resources/icon.ico"))
+                menuGroup = "ADBHub"
+                upgradeUuid = "18159732-6D3E-4F1A-8F6C-D8B5D9C8E7A1"
             }
         }
     }
