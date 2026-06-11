@@ -321,6 +321,62 @@ class DadbManager : AdbManager {
         }
     }
 
+    override suspend fun goHome(device: Device): AdbResult<String> = withContext(Dispatchers.IO) {
+        try {
+            val adbPath = getAdbPath()
+                ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
+
+            // 先尝试 keyevent 3
+            var processBuilder = ProcessBuilder(adbPath, "-s", device.serialNumber, "shell", "input", "keyevent", "3")
+            var process = processBuilder.start()
+            var exitCode = process.waitFor()
+
+            if (exitCode == 0) {
+                return@withContext AdbResult.Success("已返回桌面")
+            }
+
+            // 如果失败，尝试 am start 方式
+            processBuilder = ProcessBuilder(
+                adbPath, "-s", device.serialNumber, "shell",
+                "am", "start", "-a", "android.intent.action.MAIN",
+                "-c", "android.intent.category.HOME"
+            )
+            process = processBuilder.start()
+            val output = process.inputStream.bufferedReader().use { it.readText() }
+            val error = process.errorStream.bufferedReader().use { it.readText() }
+            exitCode = process.waitFor()
+
+            if (exitCode == 0) {
+                AdbResult.Success("已返回桌面")
+            } else {
+                AdbResult.Error("返回桌面失败: ${error.ifEmpty { output }}")
+            }
+        } catch (e: Exception) {
+            AdbResult.Error("执行返回桌面失败: ${e.message ?: ""}", e)
+        }
+    }
+
+    override suspend fun enableVerity(device: Device): AdbResult<String> = withContext(Dispatchers.IO) {
+        try {
+            val adbPath = getAdbPath()
+                ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
+
+            val processBuilder = ProcessBuilder(adbPath, "-s", device.serialNumber, "enable-verity")
+            val process = processBuilder.start()
+            val output = process.inputStream.bufferedReader().use { it.readText() }
+            val error = process.errorStream.bufferedReader().use { it.readText() }
+            val exitCode = process.waitFor()
+
+            if (exitCode == 0) {
+                AdbResult.Success(output.ifEmpty { "dm-verity 已启用，需重启设备生效" })
+            } else {
+                AdbResult.Error("启用 dm-verity 失败: ${error.ifEmpty { output }}")
+            }
+        } catch (e: Exception) {
+            AdbResult.Error("执行启用 dm-verity 失败: ${e.message ?: ""}", e)
+        }
+    }
+
     override suspend fun startApp(device: Device, packageName: String, activityName: String): AdbResult<String> =
         withContext(Dispatchers.IO) {
             try {

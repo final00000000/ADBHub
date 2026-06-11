@@ -22,6 +22,7 @@ fun MainScreen() {
 
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showSetupGuide by remember { mutableStateOf(false) }
+    var isLogFullscreen by remember { mutableStateOf(false) }
 
     // Check ADB availability on startup
     LaunchedEffect(Unit) {
@@ -41,6 +42,16 @@ fun MainScreen() {
     }
 
     Row(modifier = Modifier.fillMaxSize()) {
+        if (isLogFullscreen) {
+            // 全屏日志模式
+            LogPanel(
+                selectedDevice = selectedDevice,
+                viewModel = viewModel,
+                isFullscreen = true,
+                onToggleFullscreen = { isLogFullscreen = false },
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
             // 左栏：设备列表
             DeviceListPanel(
                 devices = devices,
@@ -69,9 +80,12 @@ fun MainScreen() {
             LogPanel(
                 selectedDevice = selectedDevice,
                 viewModel = viewModel,
+                isFullscreen = false,
+                onToggleFullscreen = { isLogFullscreen = true },
                 modifier = Modifier.width(450.dp).fillMaxHeight()
             )
         }
+    }
 
     // Dialogs
     if (showSettingsDialog) {

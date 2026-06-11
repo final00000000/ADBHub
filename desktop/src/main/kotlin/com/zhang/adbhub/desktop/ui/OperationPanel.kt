@@ -419,6 +419,94 @@ fun DeviceCommandsPanel(selectedDevice: Device?, viewModel: MainViewModel) {
             }
         }
 
+        // 回到桌面
+        OutlinedCard(
+            modifier = Modifier.fillMaxWidth().height(140.dp),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = StringResources.get("operation.go.home"),
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = StringResources.get("operation.go.home.description"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        viewModel.goHome { result ->
+                            resultText = result
+                        }
+                    },
+                    enabled = !isExecuting,
+                    modifier = Modifier.fillMaxWidth().height(40.dp)
+                ) {
+                    if (isExecuting) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Text(StringResources.get("operation.executing"))
+                        }
+                    } else {
+                        Text(StringResources.get("operation.execute.go.home"))
+                    }
+                }
+            }
+        }
+
+        // 启用 dm-verity
+        OutlinedCard(
+            modifier = Modifier.fillMaxWidth().height(140.dp),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = StringResources.get("operation.enable.verity"),
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = StringResources.get("operation.enable.verity.description"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        viewModel.enableVerity { result ->
+                            resultText = result
+                        }
+                    },
+                    enabled = !isExecuting,
+                    modifier = Modifier.fillMaxWidth().height(40.dp)
+                ) {
+                    if (isExecuting) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Text(StringResources.get("operation.executing"))
+                        }
+                    } else {
+                        Text(StringResources.get("operation.execute.enable.verity"))
+                    }
+                }
+            }
+        }
+
         // 重启命令
         OutlinedCard(
             modifier = Modifier.fillMaxWidth().height(120.dp),

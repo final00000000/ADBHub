@@ -69,6 +69,16 @@ interface AdbManager {
      */
     suspend fun rebootBootloader(device: Device): AdbResult<String>
 
+    /**
+     * 回到桌面
+     */
+    suspend fun goHome(device: Device): AdbResult<String>
+
+    /**
+     * 启用 dm-verity
+     */
+    suspend fun enableVerity(device: Device): AdbResult<String>
+
     // 应用管理命令
     /**
      * 启动指定应用

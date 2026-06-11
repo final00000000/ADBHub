@@ -197,7 +197,6 @@ class MainViewModel {
         scope.launch {
             _isExecuting.value = true
             val command = "adb -s ${device.serialNumber} push ${apkFile.absolutePath} $targetPath"
-            addOperationLog(StringResources.get("operation.push.apk"), command, null, false)
 
             try {
                 onProgress(StringResources.get("operation.pushing"))
@@ -232,6 +231,7 @@ class MainViewModel {
         _rawLogLines.value = emptyList()
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun startLogcat(filter: String = _logFilter.value) {
         val device = _selectedDevice.value ?: return
         stopLogcatFor(device)
@@ -243,8 +243,9 @@ class MainViewModel {
         val newJob = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 adbManager.getLogcatFlow(device)
-                    .collect { line ->
-                        _rawLogLines.value = (_rawLogLines.value + line).takeLast(5000)
+                    .chunked(10)
+                    .collect { lines ->
+                        _rawLogLines.value = (_rawLogLines.value + lines).takeLast(20000)
                     }
             } finally {
                 if (logcatJob === coroutineContext[Job]) {
@@ -430,6 +431,52 @@ class MainViewModel {
                     }
                     is AdbResult.Error -> {
                         addOperationLog(StringResources.get("operation.log.reboot.bootloader"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
+                    }
+                }
+            } finally {
+                _isExecuting.value = false
+            }
+        }
+    }
+
+    fun goHome(onResult: (String) -> Unit) {
+        val device = _selectedDevice.value ?: return
+        scope.launch {
+            _isExecuting.value = true
+            val command = "adb -s ${device.serialNumber} shell input keyevent KEYCODE_HOME"
+
+            try {
+                when (val result = adbManager.goHome(device)) {
+                    is AdbResult.Success -> {
+                        addOperationLog(StringResources.get("operation.go.home"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.success", result.data))
+                    }
+                    is AdbResult.Error -> {
+                        addOperationLog(StringResources.get("operation.go.home"), command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
+                    }
+                }
+            } finally {
+                _isExecuting.value = false
+            }
+        }
+    }
+
+    fun enableVerity(onResult: (String) -> Unit) {
+        val device = _selectedDevice.value ?: return
+        scope.launch {
+            _isExecuting.value = true
+            val command = "adb -s ${device.serialNumber} enable-verity"
+
+            try {
+                when (val result = adbManager.enableVerity(device)) {
+                    is AdbResult.Success -> {
+                        addOperationLog(StringResources.get("operation.enable.verity"), command, result.data, true)
+                        onResult(StringResources.get("operation.log.success", result.data))
+                    }
+                    is AdbResult.Error -> {
+                        addOperationLog(StringResources.get("operation.enable.verity"), command, result.message, false)
                         onResult(StringResources.get("operation.log.failed", result.message))
                     }
                 }

@@ -14,7 +14,8 @@ data class AdbConfig(
     val customAdbPath: String? = null,
     val lastUsedAdbPath: String? = null,
     val deviceLogPath: String? = null,
-    val pushTargetPath: String? = null
+    val pushTargetPath: String? = null,
+    val lastLogTab: Int = 1  // 0=操作历史, 1=设备日志
 ) {
     companion object {
         private val json = Json {
