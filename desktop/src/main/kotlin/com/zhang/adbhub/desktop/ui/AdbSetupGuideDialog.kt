@@ -26,6 +26,7 @@ fun AdbSetupGuideDialog(
     val customAdbPath by viewModel.customAdbPath.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
+    var showScanConsent by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -72,7 +73,7 @@ fun AdbSetupGuideDialog(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = StringResources.get("setup.manual_config"),
+                                text = StringResources.get("setup.manual.config"),
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
@@ -84,14 +85,14 @@ fun AdbSetupGuideDialog(
                                 OutlinedTextField(
                                     value = customAdbPath,
                                     onValueChange = { viewModel.setCustomPath(it) },
-                                    label = { Text(StringResources.get("setup.adb_path_label")) },
+                                    label = { Text(StringResources.get("setup.adb.path.label")) },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true
                                 )
 
                                 Button(
                                     onClick = {
-                                        val fileDialog = FileDialog(null as Frame?, StringResources.get("setup.adb_path_label"), FileDialog.LOAD)
+                                        val fileDialog = FileDialog(null as Frame?, StringResources.get("setup.adb.path.label"), FileDialog.LOAD)
                                         fileDialog.isVisible = true
                                         val directory = fileDialog.directory
                                         val file = fileDialog.file
@@ -108,12 +109,11 @@ fun AdbSetupGuideDialog(
                             if (customAdbPath.isNotBlank()) {
                                 Button(
                                     onClick = {
-                                        viewModel.saveConfig()
-                                        onAdbConfigured()
+                                        viewModel.saveConfigIfAdbValid(onAdbConfigured)
                                     },
                                     modifier = Modifier.padding(top = 8.dp).fillMaxWidth()
                                 ) {
-                                    Text(StringResources.get("setup.use_path"))
+                                    Text(StringResources.get("setup.use.path"))
                                 }
                             }
                         }
@@ -128,22 +128,22 @@ fun AdbSetupGuideDialog(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = StringResources.get("setup.auto_scan"),
+                                text = StringResources.get("setup.auto.scan"),
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Text(
-                                text = StringResources.get("setup.scan_description"),
+                                text = StringResources.get("setup.scan.description"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
                             Button(
-                                onClick = { viewModel.scanAllDrives() },
+                                onClick = { showScanConsent = true },
                                 enabled = !isScanning,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(if (isScanning) StringResources.get("setup.scanning") else StringResources.get("setup.scan_button"))
+                                Text(if (isScanning) StringResources.get("setup.scanning") else StringResources.get("setup.scan.button"))
                             }
                         }
                     }
@@ -158,7 +158,7 @@ fun AdbSetupGuideDialog(
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
-                                    text = StringResources.get("setup.detected_paths"),
+                                    text = StringResources.get("setup.detected.paths"),
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.padding(bottom = 8.dp)
@@ -179,11 +179,10 @@ fun AdbSetupGuideDialog(
                                         Button(
                                             onClick = {
                                                 viewModel.setCustomPath(path)
-                                                viewModel.saveConfig()
-                                                onAdbConfigured()
+                                                viewModel.saveConfigIfAdbValid(onAdbConfigured)
                                             }
                                         ) {
-                                            Text(StringResources.get("setup.select_path"))
+                                            Text(StringResources.get("setup.select.path"))
                                         }
                                     }
                                     if (path != detectedPaths.last()) {
@@ -203,19 +202,19 @@ fun AdbSetupGuideDialog(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = StringResources.get("setup.install_guide"),
+                                text = StringResources.get("setup.install.guide"),
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
 
                             Text(
-                                text = StringResources.get("setup.install_description"),
+                                text = StringResources.get("setup.install.description"),
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
 
                             Text(
-                                text = StringResources.get("setup.download_guide"),
+                                text = StringResources.get("setup.download.guide"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -251,5 +250,15 @@ fun AdbSetupGuideDialog(
                 }
             }
         }
+    }
+
+    if (showScanConsent) {
+        ScanDriveConsentDialog(
+            onConfirm = {
+                showScanConsent = false
+                viewModel.scanAllDrives()
+            },
+            onDismiss = { showScanConsent = false }
+        )
     }
 }

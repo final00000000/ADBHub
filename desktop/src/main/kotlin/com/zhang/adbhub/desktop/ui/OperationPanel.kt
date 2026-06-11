@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.zhang.adbhub.common.model.Device
+import com.zhang.adbhub.desktop.utils.StringResources
 import com.zhang.adbhub.desktop.viewmodel.MainViewModel
 import com.zhang.adbhub.desktop.viewmodel.OperationTab
 import java.awt.FileDialog
@@ -40,7 +41,7 @@ fun OperationPanel(
             Tab(
                 selected = selectedTab == OperationTab.PUSH_APK,
                 onClick = { onTabSelected(OperationTab.PUSH_APK) },
-                text = { Text("Push APK", style = MaterialTheme.typography.labelLarge) },
+                text = { Text(StringResources.get("operation.push.apk"), style = MaterialTheme.typography.labelLarge) },
                 icon = { Icon(Icons.Default.Android, contentDescription = null, modifier = Modifier.size(20.dp)) }
             )
             Tab(
@@ -72,12 +73,14 @@ fun OperationPanel(
         Spacer(modifier = Modifier.height(16.dp))
 
         // 内容区
-        when (selectedTab) {
-            OperationTab.PUSH_APK -> PushApkPanel(selectedDevice, viewModel)
-            OperationTab.DEVICE_COMMANDS -> DeviceCommandsPanel(selectedDevice, viewModel)
-            OperationTab.APP_MANAGEMENT -> AppManagementPanel(selectedDevice, viewModel)
-            OperationTab.FILE_MANAGER -> FileManagerPanel(selectedDevice, viewModel)
-            OperationTab.LOGS -> LogManagementPanel(selectedDevice, viewModel)
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            when (selectedTab) {
+                OperationTab.PUSH_APK -> PushApkPanel(selectedDevice, viewModel)
+                OperationTab.DEVICE_COMMANDS -> DeviceCommandsPanel(selectedDevice, viewModel)
+                OperationTab.APP_MANAGEMENT -> AppManagementPanel(selectedDevice, viewModel)
+                OperationTab.FILE_MANAGER -> FileManagerPanel(selectedDevice, viewModel)
+                OperationTab.LOGS -> LogManagementPanel(selectedDevice, viewModel)
+            }
         }
     }
 }

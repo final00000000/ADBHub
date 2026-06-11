@@ -17,7 +17,7 @@ import java.io.File
 
 @Composable
 fun SettingsDialog(
-    onDismiss: () -> Unit
+    onDismiss: (Boolean) -> Unit
 ) {
     val viewModel = remember { SettingsViewModel() }
     val customAdbPath by viewModel.customAdbPath.collectAsState()
@@ -26,6 +26,8 @@ fun SettingsDialog(
     val detectedPaths by viewModel.detectedPaths.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
     val isAdbAvailable by viewModel.isAdbAvailable.collectAsState()
+    val isScanning by viewModel.isScanning.collectAsState()
+    var showScanConsent by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -33,7 +35,7 @@ fun SettingsDialog(
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = { onDismiss(false) }) {
         Surface(
             modifier = Modifier
                 .width(600.dp)
@@ -129,6 +131,14 @@ fun SettingsDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
                     )
+
+                    OutlinedButton(
+                        onClick = { showScanConsent = true },
+                        enabled = !isScanning,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                    ) {
+                        Text(if (isScanning) StringResources.get("setup.scanning") else StringResources.get("setup.scan.button"))
+                    }
 
                     // Device Log Path
                     Text(
@@ -228,7 +238,7 @@ fun SettingsDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(
-                        onClick = onDismiss,
+                        onClick = { onDismiss(false) },
                         modifier = Modifier.height(40.dp)
                     ) {
                         Text(StringResources.get("settings.cancel"))
@@ -237,7 +247,7 @@ fun SettingsDialog(
                     Button(
                         onClick = {
                             viewModel.saveConfig()
-                            onDismiss()
+                            onDismiss(true)
                         },
                         modifier = Modifier.height(40.dp)
                     ) {
@@ -246,5 +256,15 @@ fun SettingsDialog(
                 }
             }
         }
+    }
+
+    if (showScanConsent) {
+        ScanDriveConsentDialog(
+            onConfirm = {
+                showScanConsent = false
+                viewModel.scanAllDrives()
+            },
+            onDismiss = { showScanConsent = false }
+        )
     }
 }

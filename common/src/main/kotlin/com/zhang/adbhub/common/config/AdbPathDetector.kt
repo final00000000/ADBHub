@@ -39,141 +39,77 @@ object AdbPathDetector {
     }
 
     /**
-     * 检测可能的 ADB 路径（按优先级排序）
+     * 扫描 Windows 盘符查找 ADB。调用方必须在用户明确同意后再调用。
      */
     fun detectPossiblePathCandidates(): List<AdbPathCandidate> {
-        val candidates = mutableListOf<AdbPathCandidate>()
-
-        // 1. 系统 PATH 中的 adb
-        candidates.add(
-            AdbPathCandidate(
-                path = "adb",
-                displayPath = "系统 PATH: adb"
-            )
-        )
-
-        // 2. Windows 常见路径
-        if (isWindows()) {
-            val localAppData = System.getenv("LOCALAPPDATA")
-            if (localAppData != null) {
-                candidates.add(
-                    AdbPathCandidate(
-                        path = "$localAppData\\Android\\Sdk\\platform-tools\\adb.exe",
-                        displayPath = "%LOCALAPPDATA%\\Android\\Sdk\\platform-tools\\adb.exe"
-                    )
-                )
-            }
-
-            // 自动搜索所有盘符
-            candidates.addAll(searchWindowsDrives())
-        }
-
-        // 3. macOS 常见路径
-        if (isMac()) {
-            val userHome = System.getProperty("user.home")
-            candidates.add(
-                AdbPathCandidate(
-                    path = "$userHome/Library/Android/sdk/platform-tools/adb",
-                    displayPath = "~/Library/Android/sdk/platform-tools/adb"
-                )
-            )
-            candidates.add(AdbPathCandidate("/usr/local/bin/adb", "/usr/local/bin/adb"))
-        }
-
-        // 4. Linux 常见路径
-        if (isLinux()) {
-            val userHome = System.getProperty("user.home")
-            candidates.add(
-                AdbPathCandidate(
-                    path = "$userHome/Android/Sdk/platform-tools/adb",
-                    displayPath = "~/Android/Sdk/platform-tools/adb"
-                )
-            )
-            candidates.add(AdbPathCandidate("/usr/bin/adb", "/usr/bin/adb"))
-            candidates.add(AdbPathCandidate("/usr/local/bin/adb", "/usr/local/bin/adb"))
-        }
-
-        return candidates
+        return if (isWindows()) searchWindowsDrives() else emptyList()
     }
 
     /**
-     * 检测可能的 ADB 路径（按优先级排序）
+     * 扫描 Windows 盘符查找 ADB。调用方必须在用户明确同意后再调用。
      */
     fun detectPossiblePaths(): List<String> {
         return detectPossiblePathCandidates().map { it.path }
     }
 
     /**
-     * 自动检测可用的 ADB 路径
-     */
-    fun autoDetect(): String? {
-        return detectPossiblePaths().firstOrNull { path ->
-            // 对于系统命令（如 "adb"），直接测试可用性
-            // 对于完整路径，先检查文件是否存在
-            if (path == "adb") {
-                isAdbAvailable(path)
-            } else {
-                File(path).exists() && isAdbAvailable(path)
-            }
-        }
-    }
-
-    /**
-     * 获取有效的 ADB 路径（优先级：自定义 > 自动检测 > 系统 PATH）
+     * 获取有效的 ADB 路径。只验证用户配置的路径，不做自动兜底。
      */
     fun getValidAdbPath(customPath: String?): String? {
-        // 1. 尝试用户自定义路径
-        if (!customPath.isNullOrBlank()) {
-            val file = File(customPath)
-            if (file.exists() && isAdbAvailable(customPath)) {
-                return customPath
-            }
+        val path = customPath?.trim().takeUnless { it.isNullOrEmpty() } ?: return null
+        if (isConfiguredPathRunnable(path) && isAdbAvailable(path)) {
+            return path
         }
-
-        // 2. 自动检测
-        return autoDetect()
+        return null
     }
 
     private fun isWindows(): Boolean {
         return System.getProperty("os.name").lowercase().contains("win")
     }
 
-    private fun isMac(): Boolean {
-        val osName = System.getProperty("os.name").lowercase()
-        return osName.contains("mac") || osName.contains("darwin")
-    }
-
-    private fun isLinux(): Boolean {
-        return System.getProperty("os.name").lowercase().contains("linux")
-    }
-
     /**
-     * 搜索 Windows 所有盘符下的 Android SDK
+     * 搜索 Windows 所有盘符下的 adb.exe
      */
     private fun searchWindowsDrives(): List<AdbPathCandidate> {
-        val candidates = mutableListOf<AdbPathCandidate>()
-        val roots = File.listRoots()
+        val candidates = linkedMapOf<String, AdbPathCandidate>()
 
-        for (root in roots) {
-            val paths = listOf(
-                "Android\\Sdk\\platform-tools\\adb.exe",
-                "AndroidSDK\\platform-tools\\adb.exe",
-                "SDK\\Android\\platform-tools\\adb.exe"
-            )
-
-            for (path in paths) {
-                val fullPath = File(root, path)
-                if (fullPath.exists()) {
-                    candidates.add(
+        for (root in File.listRoots()) {
+            root.walkTopDown()
+                .onEnter { directory -> shouldEnterDirectory(directory) }
+                .onFail { _, _ -> }
+                .filter { file -> file.isFile && file.name.equals("adb.exe", ignoreCase = true) }
+                .forEach { file ->
+                    val absolutePath = file.absolutePath
+                    candidates.putIfAbsent(
+                        absolutePath.lowercase(),
                         AdbPathCandidate(
-                            path = fullPath.absolutePath,
-                            displayPath = fullPath.absolutePath
+                            path = absolutePath,
+                            displayPath = absolutePath
                         )
                     )
                 }
-            }
         }
 
-        return candidates
+        return candidates.values.toList()
+    }
+
+    private fun isConfiguredPathRunnable(path: String): Boolean {
+        val file = File(path)
+        if (file.exists() && file.isFile) {
+            return true
+        }
+
+        return !path.contains('/') &&
+            !path.contains('\\') &&
+            (path.equals("adb", ignoreCase = true) || path.equals("adb.exe", ignoreCase = true))
+    }
+
+    private fun shouldEnterDirectory(directory: File): Boolean {
+        val skippedDirectoryNames = setOf(
+            "windows",
+            "system volume information",
+            "\$recycle.bin"
+        )
+        return directory.name.lowercase() !in skippedDirectoryNames
     }
 }

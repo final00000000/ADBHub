@@ -45,6 +45,7 @@ class SettingsViewModel {
         scope.launch(Dispatchers.IO) {
             withContext(Dispatchers.Main) {
                 _isScanning.value = true
+                _detectedPaths.value = emptyList()
                 _statusMessage.value = StringResources.get("status.scanning.drives")
             }
             try {
@@ -95,13 +96,38 @@ class SettingsViewModel {
     }
 
     fun saveConfig() {
-        val config = AdbConfig(
-            customAdbPath = _customAdbPath.value.takeIf { it.isNotBlank() },
-            deviceLogPath = _deviceLogPath.value.takeIf { it.isNotBlank() }
-        )
+        val config = buildConfigFromInputs()
         AdbConfig.save(config)
         checkCurrentAdb()
         _statusMessage.value = StringResources.get("status.config.saved")
+    }
+
+    fun saveConfigIfAdbValid(onValid: () -> Unit) {
+        scope.launch(Dispatchers.IO) {
+            val config = buildConfigFromInputs()
+            val validPath = AdbPathDetector.getValidAdbPath(config.customAdbPath)
+
+            if (validPath == null) {
+                withContext(Dispatchers.Main) {
+                    _statusMessage.value = StringResources.get("status.connection.failed")
+                    _isAdbAvailable.value = false
+                    _adbVersion.value = null
+                }
+                return@launch
+            }
+
+            val savedConfig = config.copy(customAdbPath = validPath)
+            AdbConfig.save(savedConfig)
+            val version = AdbPathDetector.getAdbVersion(validPath)
+
+            withContext(Dispatchers.Main) {
+                _customAdbPath.value = validPath
+                _statusMessage.value = StringResources.get("status.config.saved")
+                _isAdbAvailable.value = true
+                _adbVersion.value = version
+                onValid()
+            }
+        }
     }
 
     fun testConnection() {
@@ -139,5 +165,12 @@ class SettingsViewModel {
 
     fun cleanup() {
         scope.cancel()
+    }
+
+    private fun buildConfigFromInputs(): AdbConfig {
+        return AdbConfig.load().copy(
+            customAdbPath = _customAdbPath.value.trim().takeIf { it.isNotBlank() },
+            deviceLogPath = _deviceLogPath.value.trim().takeIf { it.isNotBlank() }
+        )
     }
 }

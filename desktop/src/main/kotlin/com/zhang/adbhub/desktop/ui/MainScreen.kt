@@ -76,9 +76,11 @@ fun MainScreen() {
     // Dialogs
     if (showSettingsDialog) {
         SettingsDialog(
-            onDismiss = {
+            onDismiss = { shouldRefresh ->
                 showSettingsDialog = false
-                viewModel.refreshDevices()
+                if (shouldRefresh) {
+                    viewModel.refreshDevices()
+                }
             }
         )
     }

@@ -42,7 +42,7 @@ class DadbManager : AdbManager {
 
             if (exitCode != 0) {
                 val error = process.errorStream.bufferedReader().use { it.readText() }
-                return@withContext AdbResult.Error("获取设备列表失败: $error)
+                return@withContext AdbResult.Error(StringResources.get("common.adb.get.devices.failed", error.ifEmpty { output }))
             }
 
             val devices = output.lines()
@@ -75,7 +75,7 @@ class DadbManager : AdbManager {
 
             AdbResult.Success(devices)
         } catch (e: Exception) {
-            AdbResult.Error("Failed to get devices: ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.get.devices.failed", e.message ?: ""), e)
         }
     }
 
@@ -100,10 +100,10 @@ class DadbManager : AdbManager {
             if (exitCode == 0) {
                 AdbResult.Success(Unit)
             } else {
-                AdbResult.Error(StringResources.get("common.adb.push.failed", ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.push.failed", error.ifEmpty { output }))
             }
         } catch (e: Exception) {
-            AdbResult.Error(StringResources.get("common.adb.push.failed", ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.push.failed", e.message ?: ""), e)
         }
     }
 
@@ -182,7 +182,7 @@ class DadbManager : AdbManager {
                 if (exitCode == 0) {
                     AdbResult.Success("日志文件夹导出成功: ${outputFolder.absolutePath}\n$output")
                 } else {
-                    AdbResult.Error(StringResources.get("common.adb.export.failed", ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.export.failed", error.ifEmpty { output }))
                 }
             } catch (e: Exception) {
                 AdbResult.Error("Failed to export logs: ${e.message}", e)
@@ -209,10 +209,10 @@ class DadbManager : AdbManager {
             if (exitCode == 0) {
                 AdbResult.Success(StringResources.get("common.adb.clear.success"))
             } else {
-                AdbResult.Error(StringResources.get("common.adb.clear.failed", ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.clear.failed", error.ifEmpty { output }))
             }
         } catch (e: Exception) {
-            AdbResult.Error(StringResources.get("common.adb.execute.clear.failed", ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.execute.clear.failed", e.message ?: ""), e)
         }
     }
 
@@ -230,10 +230,10 @@ class DadbManager : AdbManager {
             if (exitCode == 0) {
                 AdbResult.Success(output.ifEmpty { StringResources.get("common.adb.root.success") })
             } else {
-                AdbResult.Error(StringResources.get("common.adb.root.failed", ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.root.failed", error.ifEmpty { output }))
             }
         } catch (e: Exception) {
-            AdbResult.Error(StringResources.get("common.adb.execute.root.failed", ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.execute.root.failed", e.message ?: ""), e)
         }
     }
 
@@ -251,10 +251,10 @@ class DadbManager : AdbManager {
             if (exitCode == 0) {
                 AdbResult.Success(output.ifEmpty { StringResources.get("common.adb.remount.success") })
             } else {
-                AdbResult.Error(StringResources.get("common.adb.remount.failed", ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.remount.failed", error.ifEmpty { output }))
             }
         } catch (e: Exception) {
-            AdbResult.Error(StringResources.get("common.adb.execute.remount.failed", ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.execute.remount.failed", e.message ?: ""), e)
         }
     }
 
@@ -272,10 +272,10 @@ class DadbManager : AdbManager {
             if (exitCode == 0) {
                 AdbResult.Success(StringResources.get("common.adb.reboot.sent"))
             } else {
-                AdbResult.Error(StringResources.get("common.adb.reboot.failed", ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.reboot.failed", error.ifEmpty { output }))
             }
         } catch (e: Exception) {
-            AdbResult.Error(StringResources.get("common.adb.execute.reboot.failed", ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.execute.reboot.failed", e.message ?: ""), e)
         }
     }
 
@@ -293,10 +293,10 @@ class DadbManager : AdbManager {
             if (exitCode == 0) {
                 AdbResult.Success(StringResources.get("common.adb.reboot.recovery.sent"))
             } else {
-                AdbResult.Error(StringResources.get("common.adb.reboot.recovery.failed", ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.reboot.recovery.failed", error.ifEmpty { output }))
             }
         } catch (e: Exception) {
-            AdbResult.Error(StringResources.get("common.adb.execute.reboot.recovery.failed", ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.execute.reboot.recovery.failed", e.message ?: ""), e)
         }
     }
 
@@ -314,10 +314,10 @@ class DadbManager : AdbManager {
             if (exitCode == 0) {
                 AdbResult.Success(StringResources.get("common.adb.reboot.bootloader.sent"))
             } else {
-                AdbResult.Error(StringResources.get("common.adb.reboot.bootloader.failed", ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.reboot.bootloader.failed", error.ifEmpty { output }))
             }
         } catch (e: Exception) {
-            AdbResult.Error(StringResources.get("common.adb.execute.reboot.bootloader.failed", ${e.message}", e)
+            AdbResult.Error(StringResources.get("common.adb.execute.reboot.bootloader.failed", e.message ?: ""), e)
         }
     }
 
@@ -339,10 +339,10 @@ class DadbManager : AdbManager {
                 if (exitCode == 0) {
                     AdbResult.Success(output.ifEmpty { StringResources.get("common.adb.app.start.success") })
                 } else {
-                    AdbResult.Error(StringResources.get("common.adb.app.start.failed", ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.app.start.failed", error.ifEmpty { output }))
                 }
             } catch (e: Exception) {
-                AdbResult.Error(StringResources.get("common.adb.execute.app.start.failed", ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.execute.app.start.failed", e.message ?: ""), e)
             }
         }
 
@@ -363,10 +363,10 @@ class DadbManager : AdbManager {
                 if (exitCode == 0) {
                     AdbResult.Success(output)
                 } else {
-                    AdbResult.Error(StringResources.get("common.adb.app.info.failed", ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.app.info.failed", error.ifEmpty { output }))
                 }
             } catch (e: Exception) {
-                AdbResult.Error(StringResources.get("common.adb.execute.app.info.failed", ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.execute.app.info.failed", e.message ?: ""), e)
             }
         }
 
@@ -387,10 +387,10 @@ class DadbManager : AdbManager {
                 if (exitCode == 0) {
                     AdbResult.Success(StringResources.get("common.adb.app.stop.success"))
                 } else {
-                    AdbResult.Error(StringResources.get("common.adb.app.stop.failed", ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.app.stop.failed", error.ifEmpty { output }))
                 }
             } catch (e: Exception) {
-                AdbResult.Error(StringResources.get("common.adb.execute.app.stop.failed", ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.execute.app.stop.failed", e.message ?: ""), e)
             }
         }
 
@@ -411,10 +411,10 @@ class DadbManager : AdbManager {
                 if (exitCode == 0) {
                     AdbResult.Success(output.ifEmpty { StringResources.get("common.adb.app.clear.success") })
                 } else {
-                    AdbResult.Error(StringResources.get("common.adb.app.clear.failed", ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.app.clear.failed", error.ifEmpty { output }))
                 }
             } catch (e: Exception) {
-                AdbResult.Error(StringResources.get("common.adb.execute.app.clear.failed", ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.execute.app.clear.failed", e.message ?: ""), e)
             }
         }
 
@@ -433,7 +433,7 @@ class DadbManager : AdbManager {
                 val exitCode = process.waitFor()
 
                 if (exitCode != 0) {
-                    return@withContext AdbResult.Error(StringResources.get("common.adb.list.files.failed", ${error.ifEmpty { output }}")
+                    return@withContext AdbResult.Error(StringResources.get("common.adb.list.files.failed", error.ifEmpty { output }))
                 }
 
                 val files = output.lines()
@@ -444,7 +444,7 @@ class DadbManager : AdbManager {
 
                 AdbResult.Success(files)
             } catch (e: Exception) {
-                AdbResult.Error(StringResources.get("common.adb.list.files.failed", ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.list.files.failed", e.message ?: ""), e)
             }
         }
 
@@ -507,10 +507,10 @@ class DadbManager : AdbManager {
                 if (exitCode == 0) {
                     AdbResult.Success("文件下载成功: ${localPath.absolutePath}\n$output")
                 } else {
-                    AdbResult.Error(StringResources.get("common.adb.pull.failed", ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.pull.failed", error.ifEmpty { output }))
                 }
             } catch (e: Exception) {
-                AdbResult.Error(StringResources.get("common.adb.pull.failed", ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.pull.failed", e.message ?: ""), e)
             }
         }
 
@@ -535,10 +535,10 @@ class DadbManager : AdbManager {
                 if (exitCode == 0) {
                     AdbResult.Success("文件上传成功: $remotePath\n$output")
                 } else {
-                    AdbResult.Error(StringResources.get("common.adb.push.file.failed", ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.push.file.failed", error.ifEmpty { output }))
                 }
             } catch (e: Exception) {
-                AdbResult.Error(StringResources.get("common.adb.push.file.failed", ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.push.file.failed", e.message ?: ""), e)
             }
         }
 
@@ -559,10 +559,10 @@ class DadbManager : AdbManager {
                 if (exitCode == 0) {
                     AdbResult.Success(StringResources.get("common.adb.delete.success", path))
                 } else {
-                    AdbResult.Error(StringResources.get("common.adb.delete.failed", ${error.ifEmpty { output }}")
+                    AdbResult.Error(StringResources.get("common.adb.delete.failed", error.ifEmpty { output }))
                 }
             } catch (e: Exception) {
-                AdbResult.Error(StringResources.get("common.adb.delete.failed", ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.delete.failed", e.message ?: ""), e)
             }
         }
 }

@@ -2,17 +2,27 @@ package com.zhang.adbhub.desktop.viewmodel
 
 import com.zhang.adbhub.common.adb.AdbManager
 import com.zhang.adbhub.common.adb.DadbManager
+import com.zhang.adbhub.common.config.AdbConfig
+import com.zhang.adbhub.common.config.AdbPathDetector
 import com.zhang.adbhub.common.model.AdbResult
 import com.zhang.adbhub.common.model.Device
+import com.zhang.adbhub.common.model.DeviceState
 import com.zhang.adbhub.common.model.FileInfo
 import com.zhang.adbhub.desktop.utils.StringResources
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 
 class MainViewModel {
+    private companion object {
+        const val DEVICE_MONITOR_INTERVAL_MS = 2_000L
+    }
+
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val adbManager: AdbManager = DadbManager()
+    private val deviceRefreshMutex = Mutex()
 
     private val _devices = MutableStateFlow<List<Device>>(emptyList())
     val devices: StateFlow<List<Device>> = _devices.asStateFlow()
@@ -56,6 +66,11 @@ class MainViewModel {
     val fileList: StateFlow<List<FileInfo>> = _fileList.asStateFlow()
 
     private var logcatJob: Job? = null
+    private var deviceMonitorJob: Job? = null
+
+    init {
+        startDeviceMonitor()
+    }
 
     data class OperationLog(
         val timestamp: String,
@@ -73,37 +88,94 @@ class MainViewModel {
 
     fun refreshDevices() {
         scope.launch {
-            val config = com.zhang.adbhub.common.config.AdbConfig.load()
-            val adbPath = com.zhang.adbhub.common.config.AdbPathDetector.getValidAdbPath(config.customAdbPath)
+            refreshDevicesOnce(silent = false)
+        }
+    }
+
+    private fun startDeviceMonitor() {
+        if (deviceMonitorJob != null) return
+
+        deviceMonitorJob = scope.launch {
+            while (isActive) {
+                refreshDevicesOnce(silent = true)
+                delay(DEVICE_MONITOR_INTERVAL_MS)
+            }
+        }
+    }
+
+    private suspend fun refreshDevicesOnce(silent: Boolean) {
+        deviceRefreshMutex.withLock {
+            val config = withContext(Dispatchers.IO) { AdbConfig.load() }
+            val adbPath = withContext(Dispatchers.IO) { AdbPathDetector.getValidAdbPath(config.customAdbPath) }
 
             if (adbPath == null) {
                 _adbStatus.value = StringResources.get("status.adb.not.found")
-                _devices.value = emptyList()
-                return@launch
-            } else {
-                _adbStatus.value = StringResources.get("status.adb.found", adbPath)
+                applyDeviceSnapshot(emptyList(), silent)
+                if (!silent) {
+                    _statusMessage.value = StringResources.get("status.adb.not.found")
+                }
+                return
             }
 
+            _adbStatus.value = StringResources.get("status.adb.found", adbPath)
+
             when (val result = adbManager.getDevices()) {
-                is AdbResult.Success -> {
-                    _devices.value = result.data
-                    if (_selectedDevice.value == null && result.data.isNotEmpty()) {
-                        _selectedDevice.value = result.data.first()
-                    }
-                    if (result.data.isEmpty()) {
-                        _statusMessage.value = StringResources.get("status.no.device.connected")
-                    } else {
-                        _statusMessage.value = null
-                    }
-                }
+                is AdbResult.Success -> applyDeviceSnapshot(result.data, silent)
                 is AdbResult.Error -> {
-                    _statusMessage.value = StringResources.get("status.get.devices.failed", result.message)
+                    if (!silent) {
+                        _statusMessage.value = StringResources.get("status.get.devices.failed", result.message)
+                    }
                 }
             }
         }
     }
 
+    private fun applyDeviceSnapshot(latestDevices: List<Device>, silent: Boolean) {
+        val previousSelectedDevice = _selectedDevice.value
+        val onlineDevices = latestDevices.filter { it.state == DeviceState.ONLINE }
+        val updatedSelectedDevice = previousSelectedDevice?.let { selected ->
+            onlineDevices.firstOrNull { it.serialNumber == selected.serialNumber }
+        }
+
+        _devices.value = latestDevices
+
+        when {
+            previousSelectedDevice != null && updatedSelectedDevice == null -> {
+                clearSelectedDevice(previousSelectedDevice)
+                _statusMessage.value = StringResources.get("status.device.disconnected", previousSelectedDevice.serialNumber)
+            }
+            updatedSelectedDevice != null -> {
+                _selectedDevice.value = updatedSelectedDevice
+                if (!silent) {
+                    _statusMessage.value = null
+                }
+            }
+            onlineDevices.isNotEmpty() -> {
+                _selectedDevice.value = onlineDevices.first()
+                if (!silent) {
+                    _statusMessage.value = null
+                }
+            }
+            !silent -> {
+                _statusMessage.value = StringResources.get("status.no.device.connected")
+            }
+        }
+    }
+
+    private fun clearSelectedDevice(device: Device?) {
+        stopLogcatFor(device)
+        _selectedDevice.value = null
+        _rawLogLines.value = emptyList()
+        _currentPath.value = "/sdcard/"
+        _fileList.value = emptyList()
+    }
+
     fun selectDevice(device: Device) {
+        if (device.state != DeviceState.ONLINE) {
+            _statusMessage.value = StringResources.get("status.device.not.online", device.serialNumber)
+            return
+        }
+
         val previousDevice = _selectedDevice.value
         if (previousDevice?.serialNumber == device.serialNumber) {
             return
@@ -575,6 +647,7 @@ class MainViewModel {
 
     fun cleanup() {
         stopLogcat()
+        deviceMonitorJob?.cancel()
         scope.cancel()
     }
 }

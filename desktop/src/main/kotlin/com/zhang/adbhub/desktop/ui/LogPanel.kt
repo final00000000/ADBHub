@@ -1,7 +1,9 @@
 package com.zhang.adbhub.desktop.ui
 
+import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Clear
@@ -67,7 +71,7 @@ fun LogPanel(
 ) {
     var selectedLogTab by remember { mutableStateOf(0) }
 
-    Column(modifier = modifier.padding(16.dp)) {
+    Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
         TabRow(
             selectedTabIndex = selectedLogTab,
             containerColor = MaterialTheme.colorScheme.surface,
@@ -101,9 +105,11 @@ fun LogPanel(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        when (selectedLogTab) {
-            0 -> OperationLogView(viewModel, modifier = Modifier.fillMaxSize())
-            1 -> DeviceLogView(selectedDevice, viewModel, modifier = Modifier.fillMaxSize())
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            when (selectedLogTab) {
+                0 -> OperationLogView(viewModel, modifier = Modifier.fillMaxSize())
+                1 -> DeviceLogView(selectedDevice, viewModel, modifier = Modifier.fillMaxSize())
+            }
         }
     }
 }
@@ -236,9 +242,16 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, modifier: M
     var exportStatus by remember { mutableStateOf("") }
 
     val listState = rememberLazyListState()
+    val horizontalLogScrollState = rememberScrollState()
 
-    LaunchedEffect(logLines.size) {
-        if (logLines.isNotEmpty() && isLogcatRunning) {
+    LaunchedEffect(filterText) {
+        if (logLines.isNotEmpty() && filterText.isNotBlank()) {
+            listState.scrollToItem(0)
+        }
+    }
+
+    LaunchedEffect(logLines.size, filterText, isLogcatRunning) {
+        if (logLines.isNotEmpty() && isLogcatRunning && filterText.isBlank()) {
             listState.scrollToItem(logLines.lastIndex)
         }
     }
@@ -399,30 +412,45 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, modifier: M
                 }
                 else -> {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        LazyColumn(
-                            state = listState,
+                        Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(end = 12.dp, start = 8.dp, top = 8.dp, bottom = 8.dp)
+                                .padding(end = 12.dp, start = 8.dp, top = 8.dp, bottom = 20.dp)
+                                .horizontalScroll(horizontalLogScrollState)
                         ) {
-                            items(logLines) { line ->
-                                LogLineItem(line)
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.width(2400.dp).fillMaxHeight()
+                            ) {
+                                items(logLines) { line ->
+                                    LogLineItem(
+                                        line = line,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
                             }
                         }
                         VerticalScrollbar(
                             adapter = rememberScrollbarAdapter(listState),
                             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
                         )
+                        HorizontalScrollbar(
+                            adapter = rememberScrollbarAdapter(horizontalLogScrollState),
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .fillMaxWidth()
+                                .padding(start = 8.dp, end = 20.dp)
+                        )
                     }
                 }
             }
         }
 
-        Box(
-            modifier = Modifier.fillMaxWidth().height(60.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            if (exportStatus.isNotEmpty()) {
+        if (exportStatus.isNotEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 32.dp, max = 60.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
                 Text(
                     text = exportStatus,
                     style = MaterialTheme.typography.bodySmall,
@@ -453,7 +481,10 @@ private fun EmptyLogMessage(message: String) {
 }
 
 @Composable
-private fun LogLineItem(line: String) {
+private fun LogLineItem(
+    line: String,
+    modifier: Modifier = Modifier
+) {
     Text(
         text = line,
         fontSize = 11.sp,
@@ -461,8 +492,8 @@ private fun LogLineItem(line: String) {
         color = MaterialTheme.colorScheme.onSurface,
         lineHeight = 14.sp,
         maxLines = 1,
-        modifier = Modifier
-            .fillMaxWidth()
+        softWrap = false,
+        modifier = modifier
             .height(20.dp)
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.45f))
             .padding(horizontal = 8.dp, vertical = 3.dp)

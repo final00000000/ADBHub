@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -42,7 +44,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
             text = StringResources.get("file.manager.title"),
@@ -81,7 +83,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         ) {
             Button(
                 onClick = {
-                    val dialog = FileDialog(Frame(), StringResources.get("file.manager.select_file_upload"), FileDialog.LOAD)
+                    val dialog = FileDialog(Frame(), StringResources.get("file.manager.select.file.upload"), FileDialog.LOAD)
                     dialog.isVisible = true
                     val file = dialog.file
                     val dir = dialog.directory
@@ -102,13 +104,13 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
             ) {
                 Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(StringResources.get("file.manager.upload_file"))
+                Text(StringResources.get("file.manager.upload.file"))
             }
 
             Button(
                 onClick = {
                     viewModel.navigateToPath(currentPath)
-                    resultText = StringResources.get("file.manager.directory_refreshed")
+                    resultText = StringResources.get("file.manager.directory.refreshed")
                 },
                 enabled = !isExecuting,
                 modifier = Modifier.weight(1f).fillMaxHeight()
@@ -119,9 +121,9 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
             }
         }
 
-        // 文件列表 - 固定高度
+        // 文件列表使用剩余高度，避免挤压底部结果区域
         OutlinedCard(
-            modifier = Modifier.fillMaxWidth().height(320.dp),
+            modifier = Modifier.fillMaxWidth().weight(1f).heightIn(min = 180.dp),
             shape = MaterialTheme.shapes.medium
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -132,7 +134,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                         )
                     } else {
                     Text(
-                        text = StringResources.get("file.manager.directory_empty_or_inaccessible"),
+                        text = StringResources.get("file.manager.directory.empty.or.inaccessible"),
                         modifier = Modifier.align(Alignment.Center).padding(16.dp),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -147,7 +149,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                             resultText = ""
                         },
                         onDownload = { fileInfo ->
-                            val dialog = FileDialog(Frame(), StringResources.get("file.manager.save_file"), FileDialog.SAVE)
+                            val dialog = FileDialog(Frame(), StringResources.get("file.manager.save.file"), FileDialog.SAVE)
                             dialog.file = fileInfo.name
                             dialog.isVisible = true
                             val file = dialog.file
@@ -169,28 +171,31 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
             }
         }
 
-        // 结果显示 - 固定高度防止跳动
+        // 结果显示固定可见，内容过长时内部滚动
         OutlinedCard(
-            modifier = Modifier.fillMaxWidth().height(100.dp),
+            modifier = Modifier.fillMaxWidth().height(120.dp),
             shape = MaterialTheme.shapes.medium
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = StringResources.get("file.manager.operation_result"),
+                    text = StringResources.get("file.manager.operation.result"),
                     style = MaterialTheme.typography.titleSmall
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                if (resultText.isNotEmpty()) {
-                    Text(
-                        text = resultText,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                } else {
-                    Text(
-                        text = StringResources.get("file.manager.waiting_for_operation"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (resultText.isNotEmpty()) {
+                        Text(
+                            text = resultText,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.verticalScroll(rememberScrollState())
+                        )
+                    } else {
+                        Text(
+                            text = StringResources.get("file.manager.waiting.for.operation"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -200,9 +205,9 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
     if (showDeleteDialog && fileToDelete != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text(StringResources.get("file.manager.confirm_delete")) },
+            title = { Text(StringResources.get("file.manager.confirm.delete")) },
             text = {
-                Text(StringResources.get("file.manager.delete_confirmation_message", fileToDelete!!.name, if (fileToDelete!!.isDirectory) StringResources.get("file.manager.delete_directory_warning") else ""))
+                Text(StringResources.get("file.manager.delete.confirmation.message", fileToDelete!!.name, if (fileToDelete!!.isDirectory) StringResources.get("file.manager.delete.directory.warning") else ""))
             },
             confirmButton = {
                 Button(
@@ -227,7 +232,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                     showDeleteDialog = false
                     fileToDelete = null
                 }) {
-                    Text(StringResources.get("file.manager.cancel"))
+                    Text(StringResources.get("settings.cancel"))
                 }
             }
         )
