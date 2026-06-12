@@ -216,6 +216,33 @@ class DadbManager : AdbManager {
         }
     }
 
+    override suspend fun executeDeviceCommand(device: Device, arguments: List<String>): AdbResult<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                if (arguments.isEmpty()) {
+                    return@withContext AdbResult.Error(StringResources.get("common.adb.command.empty"))
+                }
+
+                val adbPath = getAdbPath()
+                    ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
+
+                val processBuilder = ProcessBuilder(listOf(adbPath, "-s", device.serialNumber) + arguments)
+                    .redirectErrorStream(false)
+                val process = processBuilder.start()
+                val output = process.inputStream.bufferedReader().use { it.readText() }
+                val error = process.errorStream.bufferedReader().use { it.readText() }
+                val exitCode = process.waitFor()
+
+                if (exitCode == 0) {
+                    AdbResult.Success(output.ifBlank { StringResources.get("common.adb.command.success") })
+                } else {
+                    AdbResult.Error(StringResources.get("common.adb.command.failed", error.ifBlank { output }))
+                }
+            } catch (e: Exception) {
+                AdbResult.Error(StringResources.get("common.adb.command.failed", e.message ?: ""), e)
+            }
+        }
+
     override suspend fun executeRoot(device: Device): AdbResult<String> = withContext(Dispatchers.IO) {
         try {
             val adbPath = getAdbPath()

@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.zhang.adbhub"
-version = "1.0.0"
+version = "1.1.0"
 
 dependencies {
     // Common module
@@ -32,10 +32,11 @@ compose.desktop {
             targetFormats(
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe,
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb
             )
             packageName = "ADBHub"
-            packageVersion = "1.0.0"
+            packageVersion = "1.1.0"
             description = "Android Debug Bridge 管理工具"
             vendor = "ADBHub Team"
 

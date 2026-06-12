@@ -15,6 +15,19 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 
+enum class DeviceDetectionStatus {
+    OK,
+    WARNING,
+    ERROR,
+    PENDING
+}
+
+data class DeviceDetectionItem(
+    val title: String,
+    val detail: String,
+    val status: DeviceDetectionStatus
+)
+
 class MainViewModel {
     private companion object {
         const val DEVICE_MONITOR_INTERVAL_MS = 2_000L
@@ -30,7 +43,7 @@ class MainViewModel {
     private val _selectedDevice = MutableStateFlow<Device?>(null)
     val selectedDevice: StateFlow<Device?> = _selectedDevice.asStateFlow()
 
-    private val _selectedTab = MutableStateFlow(OperationTab.PUSH_APK)
+    private val _selectedTab = MutableStateFlow(OperationTab.DEVICE_COMMANDS)
     val selectedTab: StateFlow<OperationTab> = _selectedTab.asStateFlow()
 
     private val _rawLogLines = MutableStateFlow<List<String>>(emptyList())
@@ -52,6 +65,9 @@ class MainViewModel {
 
     private val _adbStatus = MutableStateFlow<String?>(null)
     val adbStatus: StateFlow<String?> = _adbStatus.asStateFlow()
+
+    private val _deviceDiagnostics = MutableStateFlow(defaultDeviceDiagnostics())
+    val deviceDiagnostics: StateFlow<List<DeviceDetectionItem>> = _deviceDiagnostics.asStateFlow()
 
     private val _isExecuting = MutableStateFlow(false)
     val isExecuting: StateFlow<Boolean> = _isExecuting.asStateFlow()
@@ -106,10 +122,12 @@ class MainViewModel {
     private suspend fun refreshDevicesOnce(silent: Boolean) {
         deviceRefreshMutex.withLock {
             val config = withContext(Dispatchers.IO) { AdbConfig.load() }
+            val configuredAdbPath = config.customAdbPath?.trim().orEmpty()
             val adbPath = withContext(Dispatchers.IO) { AdbPathDetector.getValidAdbPath(config.customAdbPath) }
 
             if (adbPath == null) {
                 _adbStatus.value = StringResources.get("status.adb.not.found")
+                _deviceDiagnostics.value = buildAdbMissingDiagnostics(configuredAdbPath)
                 applyDeviceSnapshot(emptyList(), silent)
                 if (!silent) {
                     _statusMessage.value = StringResources.get("status.adb.not.found")
@@ -120,13 +138,188 @@ class MainViewModel {
             _adbStatus.value = StringResources.get("status.adb.found", adbPath)
 
             when (val result = adbManager.getDevices()) {
-                is AdbResult.Success -> applyDeviceSnapshot(result.data, silent)
+                is AdbResult.Success -> {
+                    _deviceDiagnostics.value = buildDeviceDiagnostics(adbPath, result.data)
+                    applyDeviceSnapshot(result.data, silent)
+                }
                 is AdbResult.Error -> {
+                    _deviceDiagnostics.value = buildDeviceQueryErrorDiagnostics(adbPath, result.message)
                     if (!silent) {
                         _statusMessage.value = StringResources.get("status.get.devices.failed", result.message)
                     }
                 }
             }
+        }
+    }
+
+    private fun defaultDeviceDiagnostics(): List<DeviceDetectionItem> {
+        return listOf(
+            DeviceDetectionItem(
+                StringResources.get("device.diagnostic.adb.path"),
+                StringResources.get("device.diagnostic.adb.path.pending"),
+                DeviceDetectionStatus.PENDING
+            ),
+            DeviceDetectionItem(
+                StringResources.get("device.diagnostic.adb.command"),
+                StringResources.get("device.diagnostic.adb.command.pending"),
+                DeviceDetectionStatus.PENDING
+            ),
+            DeviceDetectionItem(
+                StringResources.get("device.diagnostic.device.connection"),
+                StringResources.get("device.diagnostic.device.connection.pending"),
+                DeviceDetectionStatus.PENDING
+            ),
+            DeviceDetectionItem(
+                StringResources.get("device.diagnostic.device.usb"),
+                StringResources.get("device.diagnostic.device.usb.pending"),
+                DeviceDetectionStatus.PENDING
+            )
+        )
+    }
+
+    private fun buildAdbMissingDiagnostics(configuredAdbPath: String): List<DeviceDetectionItem> {
+        val adbPathDetail = if (configuredAdbPath.isBlank()) {
+            StringResources.get("device.diagnostic.adb.path.missing")
+        } else {
+            StringResources.get("device.diagnostic.adb.path.invalid", configuredAdbPath)
+        }
+
+        return listOf(
+            DeviceDetectionItem(
+                StringResources.get("device.diagnostic.adb.path"),
+                adbPathDetail,
+                DeviceDetectionStatus.ERROR
+            ),
+            DeviceDetectionItem(
+                StringResources.get("device.diagnostic.adb.command"),
+                StringResources.get("device.diagnostic.adb.command.pending"),
+                DeviceDetectionStatus.PENDING
+            ),
+            DeviceDetectionItem(
+                StringResources.get("device.diagnostic.device.connection"),
+                StringResources.get("device.diagnostic.device.connection.pending"),
+                DeviceDetectionStatus.PENDING
+            ),
+            DeviceDetectionItem(
+                StringResources.get("device.diagnostic.device.usb"),
+                StringResources.get("device.diagnostic.device.usb.pending"),
+                DeviceDetectionStatus.PENDING
+            )
+        )
+    }
+
+    private fun buildDeviceQueryErrorDiagnostics(adbPath: String, errorMessage: String): List<DeviceDetectionItem> {
+        return listOf(
+            DeviceDetectionItem(
+                StringResources.get("device.diagnostic.adb.path"),
+                StringResources.get("device.diagnostic.adb.path.ok", adbPath),
+                DeviceDetectionStatus.OK
+            ),
+            DeviceDetectionItem(
+                StringResources.get("device.diagnostic.adb.command"),
+                StringResources.get("device.diagnostic.adb.command.failed", errorMessage),
+                DeviceDetectionStatus.ERROR
+            ),
+            DeviceDetectionItem(
+                StringResources.get("device.diagnostic.device.connection"),
+                StringResources.get("device.diagnostic.device.connection.pending"),
+                DeviceDetectionStatus.PENDING
+            ),
+            DeviceDetectionItem(
+                StringResources.get("device.diagnostic.device.usb"),
+                StringResources.get("device.diagnostic.device.usb.pending"),
+                DeviceDetectionStatus.PENDING
+            )
+        )
+    }
+
+    private fun buildDeviceDiagnostics(adbPath: String, latestDevices: List<Device>): List<DeviceDetectionItem> {
+        val diagnostics = mutableListOf(
+            DeviceDetectionItem(
+                StringResources.get("device.diagnostic.adb.path"),
+                StringResources.get("device.diagnostic.adb.path.ok", adbPath),
+                DeviceDetectionStatus.OK
+            ),
+            DeviceDetectionItem(
+                StringResources.get("device.diagnostic.adb.command"),
+                StringResources.get("device.diagnostic.adb.command.ok"),
+                DeviceDetectionStatus.OK
+            )
+        )
+
+        if (latestDevices.isEmpty()) {
+            diagnostics += DeviceDetectionItem(
+                StringResources.get("device.diagnostic.device.connection"),
+                StringResources.get("device.diagnostic.device.connection.none"),
+                DeviceDetectionStatus.ERROR
+            )
+            diagnostics += DeviceDetectionItem(
+                StringResources.get("device.diagnostic.device.usb"),
+                StringResources.get("device.diagnostic.device.usb.pending"),
+                DeviceDetectionStatus.PENDING
+            )
+            return diagnostics
+        }
+
+        val onlineDevices = latestDevices.filter { it.state == DeviceState.ONLINE }
+        val unauthorizedDevices = latestDevices.filter { it.state == DeviceState.UNAUTHORIZED }
+        val offlineDevices = latestDevices.filter { it.state == DeviceState.OFFLINE }
+        val unknownDevices = latestDevices.filter { it.state == DeviceState.UNKNOWN }
+
+        diagnostics += DeviceDetectionItem(
+            StringResources.get("device.diagnostic.device.connection"),
+            StringResources.get(
+                "device.diagnostic.device.connection.detected",
+                latestDevices.size,
+                summarizeSerials(latestDevices)
+            ),
+            if (onlineDevices.isNotEmpty()) DeviceDetectionStatus.OK else DeviceDetectionStatus.WARNING
+        )
+
+        diagnostics += when {
+            onlineDevices.isNotEmpty() -> DeviceDetectionItem(
+                StringResources.get("device.diagnostic.device.online"),
+                StringResources.get("device.diagnostic.device.online.ok", onlineDevices.size),
+                DeviceDetectionStatus.OK
+            )
+            unauthorizedDevices.isNotEmpty() -> DeviceDetectionItem(
+                StringResources.get("device.diagnostic.device.usb"),
+                StringResources.get(
+                    "device.diagnostic.device.unauthorized",
+                    unauthorizedDevices.size,
+                    summarizeSerials(unauthorizedDevices)
+                ),
+                DeviceDetectionStatus.ERROR
+            )
+            offlineDevices.isNotEmpty() -> DeviceDetectionItem(
+                StringResources.get("device.diagnostic.device.online"),
+                StringResources.get(
+                    "device.diagnostic.device.offline",
+                    offlineDevices.size,
+                    summarizeSerials(offlineDevices)
+                ),
+                DeviceDetectionStatus.ERROR
+            )
+            else -> DeviceDetectionItem(
+                StringResources.get("device.diagnostic.device.online"),
+                StringResources.get(
+                    "device.diagnostic.device.unknown",
+                    unknownDevices.size,
+                    summarizeSerials(unknownDevices)
+                ),
+                DeviceDetectionStatus.WARNING
+            )
+        }
+
+        return diagnostics
+    }
+
+    private fun summarizeSerials(devices: List<Device>): String {
+        val serials = devices.map { it.serialNumber }
+        return if (serials.size <= 2) {
+            serials.joinToString(", ")
+        } else {
+            serials.take(2).joinToString(", ") + " +${serials.size - 2}"
         }
     }
 
@@ -323,6 +516,29 @@ class MainViewModel {
 
     fun clearStatus() {
         _statusMessage.value = null
+    }
+
+    fun executeDeviceCommand(operation: String, arguments: List<String>, onResult: (String) -> Unit) {
+        val device = _selectedDevice.value ?: return
+        scope.launch {
+            _isExecuting.value = true
+            val command = "adb -s ${device.serialNumber} ${arguments.joinToString(" ")}"
+
+            try {
+                when (val result = adbManager.executeDeviceCommand(device, arguments)) {
+                    is AdbResult.Success -> {
+                        addOperationLog(operation, command, result.data, true)
+                        onResult(result.data)
+                    }
+                    is AdbResult.Error -> {
+                        addOperationLog(operation, command, result.message, false)
+                        onResult(StringResources.get("operation.log.failed", result.message))
+                    }
+                }
+            } finally {
+                _isExecuting.value = false
+            }
+        }
     }
 
     fun executeRoot(onResult: (String) -> Unit) {

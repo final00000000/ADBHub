@@ -19,6 +19,7 @@ fun MainScreen() {
     val selectedDevice by viewModel.selectedDevice.collectAsState()
     val selectedTab by viewModel.selectedTab.collectAsState()
     val adbStatus by viewModel.adbStatus.collectAsState()
+    val deviceDiagnostics by viewModel.deviceDiagnostics.collectAsState()
 
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showSetupGuide by remember { mutableStateOf(false) }
@@ -60,7 +61,8 @@ fun MainScreen() {
                 onRefresh = { viewModel.refreshDevices() },
                 onSettingsClick = { showSettingsDialog = true },
                 adbStatus = adbStatus,
-                modifier = Modifier.width(250.dp).fillMaxHeight()
+                deviceDiagnostics = deviceDiagnostics,
+                modifier = Modifier.width(280.dp).fillMaxHeight()
             )
 
             VerticalDivider(modifier = Modifier.width(1.dp).fillMaxHeight())

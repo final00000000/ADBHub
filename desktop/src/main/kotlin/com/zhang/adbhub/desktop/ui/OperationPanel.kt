@@ -1,19 +1,37 @@
 package com.zhang.adbhub.desktop.ui
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.automirrored.filled.Article
-import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.zhang.adbhub.common.model.Device
 import com.zhang.adbhub.desktop.utils.StringResources
@@ -32,43 +50,11 @@ fun OperationPanel(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.padding(16.dp)) {
-        // Tab 选择
-        TabRow(
-            selectedTabIndex = selectedTab.ordinal,
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.primary
-        ) {
-            Tab(
-                selected = selectedTab == OperationTab.PUSH_APK,
-                onClick = { onTabSelected(OperationTab.PUSH_APK) },
-                text = { Text(StringResources.get("operation.push.apk"), style = MaterialTheme.typography.labelLarge) },
-                icon = { Icon(Icons.Default.Android, contentDescription = null, modifier = Modifier.size(20.dp)) }
-            )
-            Tab(
-                selected = selectedTab == OperationTab.DEVICE_COMMANDS,
-                onClick = { onTabSelected(OperationTab.DEVICE_COMMANDS) },
-                text = { Text(StringResources.get("operation.device.commands"), style = MaterialTheme.typography.labelLarge) },
-                icon = { Icon(Icons.Default.PhoneAndroid, contentDescription = null, modifier = Modifier.size(20.dp)) }
-            )
-            Tab(
-                selected = selectedTab == OperationTab.APP_MANAGEMENT,
-                onClick = { onTabSelected(OperationTab.APP_MANAGEMENT) },
-                text = { Text(StringResources.get("operation.app.management"), style = MaterialTheme.typography.labelLarge) },
-                icon = { Icon(Icons.Default.Apps, contentDescription = null, modifier = Modifier.size(20.dp)) }
-            )
-            Tab(
-                selected = selectedTab == OperationTab.FILE_MANAGER,
-                onClick = { onTabSelected(OperationTab.FILE_MANAGER) },
-                text = { Text(StringResources.get("file.manager.title"), style = MaterialTheme.typography.labelLarge) },
-                icon = { Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(20.dp)) }
-            )
-            Tab(
-                selected = selectedTab == OperationTab.LOGS,
-                onClick = { onTabSelected(OperationTab.LOGS) },
-                text = { Text(StringResources.get("operation.log.management"), style = MaterialTheme.typography.labelLarge) },
-                icon = { Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null, modifier = Modifier.size(20.dp)) }
-            )
-        }
+        OperationTabBar(
+            selectedTab = selectedTab,
+            onTabSelected = onTabSelected,
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -76,10 +62,120 @@ fun OperationPanel(
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (selectedTab) {
                 OperationTab.PUSH_APK -> PushApkPanel(selectedDevice, viewModel)
-                OperationTab.DEVICE_COMMANDS -> DeviceCommandsPanel(selectedDevice, viewModel)
+                OperationTab.DEVICE_COMMANDS -> VehicleDeviceCommandsPanel(selectedDevice, viewModel)
                 OperationTab.APP_MANAGEMENT -> AppManagementPanel(selectedDevice, viewModel)
                 OperationTab.FILE_MANAGER -> FileManagerPanel(selectedDevice, viewModel)
                 OperationTab.LOGS -> LogManagementPanel(selectedDevice, viewModel)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OperationTabBar(
+    selectedTab: OperationTab,
+    onTabSelected: (OperationTab) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.height(76.dp)) {
+        Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            OperationTabButton(
+                selected = selectedTab == OperationTab.PUSH_APK,
+                label = StringResources.get("operation.tab.push.apk"),
+                icon = Icons.Default.Android,
+                onClick = { onTabSelected(OperationTab.PUSH_APK) },
+                modifier = Modifier.weight(1f)
+            )
+            OperationTabButton(
+                selected = selectedTab == OperationTab.DEVICE_COMMANDS,
+                label = StringResources.get("operation.tab.device.commands"),
+                icon = Icons.Default.PhoneAndroid,
+                onClick = { onTabSelected(OperationTab.DEVICE_COMMANDS) },
+                modifier = Modifier.weight(1f)
+            )
+            OperationTabButton(
+                selected = selectedTab == OperationTab.APP_MANAGEMENT,
+                label = StringResources.get("operation.tab.app.management"),
+                icon = Icons.Default.Apps,
+                onClick = { onTabSelected(OperationTab.APP_MANAGEMENT) },
+                modifier = Modifier.weight(1f)
+            )
+            OperationTabButton(
+                selected = selectedTab == OperationTab.FILE_MANAGER,
+                label = StringResources.get("operation.tab.file.manager"),
+                icon = Icons.Default.FolderOpen,
+                onClick = { onTabSelected(OperationTab.FILE_MANAGER) },
+                modifier = Modifier.weight(1f)
+            )
+            OperationTabButton(
+                selected = selectedTab == OperationTab.LOGS,
+                label = StringResources.get("operation.tab.log.management"),
+                icon = Icons.AutoMirrored.Filled.Article,
+                onClick = { onTabSelected(OperationTab.LOGS) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+        HorizontalDivider()
+    }
+}
+
+@Composable
+private fun OperationTabButton(
+    selected: Boolean,
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val color = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = color,
+                maxLines = 1
+            )
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(3.dp)
+                .padding(horizontal = 8.dp)
+        ) {
+            if (selected) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.primary,
+                    shape = MaterialTheme.shapes.extraSmall,
+                    content = {}
+                )
             }
         }
     }
@@ -114,9 +210,8 @@ fun PushApkPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         )
 
         if (selectedDevice == null) {
-            Text(
-                text = StringResources.get("operation.select.device.first"),
-                color = MaterialTheme.colorScheme.error
+            DeviceRequiredPrompt(
+                modifier = Modifier.weight(1f).fillMaxWidth()
             )
             return
         }
@@ -286,9 +381,9 @@ fun LogManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         )
 
         if (selectedDevice == null) {
-            Text(
-                text = StringResources.get("operation.select.device.first"),
-                color = MaterialTheme.colorScheme.error
+            DeviceRequiredPrompt(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                description = StringResources.get("log.panel.select.device")
             )
             return
         }
@@ -299,6 +394,453 @@ fun LogManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+private data class DeviceCommandGroup(
+    val title: String,
+    val actions: List<DeviceCommandAction>
+)
+
+private data class DeviceCommandAction(
+    val title: String,
+    val description: String,
+    val commandPreview: String,
+    val arguments: List<String>,
+    val icon: ImageVector,
+    val destructive: Boolean = false
+)
+
+@Composable
+fun VehicleDeviceCommandsPanel(selectedDevice: Device?, viewModel: MainViewModel) {
+    var resultText by remember { mutableStateOf("") }
+    var runningCommandTitle by remember { mutableStateOf<String?>(null) }
+    val commandScrollState = rememberScrollState()
+    val resultScrollState = rememberScrollState()
+    val isExecuting by viewModel.isExecuting.collectAsState()
+    val commandGroups = remember { buildVehicleCommandGroups() }
+
+    LaunchedEffect(selectedDevice?.serialNumber) {
+        resultText = ""
+        runningCommandTitle = null
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Text(
+            text = StringResources.get("operation.device.commands"),
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (selectedDevice == null) {
+            DeviceRequiredPrompt(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                description = StringResources.get("operation.command.connect.first")
+            )
+            return@Column
+        }
+
+        DeviceCommandTargetBar(selectedDevice = selectedDevice)
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .clipToBounds()
+                .verticalScroll(commandScrollState),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            commandGroups.forEach { group ->
+                DeviceCommandGroupSection(
+                    group = group,
+                    enabled = !isExecuting,
+                    runningCommandTitle = runningCommandTitle,
+                    onCommandClick = { action ->
+                        runningCommandTitle = action.title
+                        resultText = StringResources.get(
+                            "operation.command.running",
+                            action.title,
+                            action.commandPreview
+                        )
+                        viewModel.executeDeviceCommand(action.title, action.arguments) { result ->
+                            resultText = StringResources.get(
+                                "operation.command.result.format",
+                                action.title,
+                                action.commandPreview,
+                                result
+                            )
+                            runningCommandTitle = null
+                        }
+                    }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        DeviceCommandResultPanel(
+            resultText = resultText,
+            scrollState = resultScrollState,
+            modifier = Modifier.fillMaxWidth().height(176.dp)
+        )
+    }
+}
+
+@Composable
+private fun DeviceCommandTargetBar(selectedDevice: Device?) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.small
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.PhoneAndroid,
+                contentDescription = null,
+                tint = if (selectedDevice == null) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.primary
+                },
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = StringResources.get("operation.target.device.label"),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+                Text(
+                    text = selectedDevice?.let { it.model ?: it.serialNumber }
+                        ?: StringResources.get("operation.select.device.first"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (selectedDevice == null) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeviceCommandGroupSection(
+    group: DeviceCommandGroup,
+    enabled: Boolean,
+    runningCommandTitle: String?,
+    onCommandClick: (DeviceCommandAction) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = group.title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        group.actions.chunked(2).forEach { rowActions ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rowActions.forEach { action ->
+                    DeviceCommandButton(
+                        action = action,
+                        enabled = enabled,
+                        isRunning = runningCommandTitle == action.title,
+                        onClick = { onCommandClick(action) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                if (rowActions.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f).height(72.dp))
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun DeviceCommandButton(
+    action: DeviceCommandAction,
+    enabled: Boolean,
+    isRunning: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(72.dp),
+        shape = MaterialTheme.shapes.small,
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+        colors = if (action.destructive) {
+            ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+        } else {
+            ButtonDefaults.outlinedButtonColors()
+        }
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isRunning) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Icon(
+                    imageVector = action.icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = action.title,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = action.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeviceCommandResultPanel(
+    resultText: String,
+    scrollState: androidx.compose.foundation.ScrollState,
+    modifier: Modifier = Modifier
+) {
+    OutlinedCard(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
+            Text(
+                text = StringResources.get("operation.result"),
+                style = MaterialTheme.typography.titleSmall
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState)
+            ) {
+                SelectionContainer {
+                    Text(
+                        text = resultText.ifBlank { StringResources.get("operation.command.result.empty") },
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = if (resultText.isBlank()) null else FontFamily.Monospace,
+                        color = if (resultText.isBlank()) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun buildVehicleCommandGroups(): List<DeviceCommandGroup> {
+    return listOf(
+        DeviceCommandGroup(
+            title = StringResources.get("operation.command.group.quick"),
+            actions = listOf(
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.home"),
+                    description = StringResources.get("operation.command.home.desc"),
+                    commandPreview = "shell input keyevent KEYCODE_HOME",
+                    arguments = listOf("shell", "input", "keyevent", "KEYCODE_HOME"),
+                    icon = Icons.Default.Home
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.back"),
+                    description = StringResources.get("operation.command.back.desc"),
+                    commandPreview = "shell input keyevent KEYCODE_BACK",
+                    arguments = listOf("shell", "input", "keyevent", "KEYCODE_BACK"),
+                    icon = Icons.AutoMirrored.Filled.ArrowBack
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.recent"),
+                    description = StringResources.get("operation.command.recent.desc"),
+                    commandPreview = "shell input keyevent KEYCODE_APP_SWITCH",
+                    arguments = listOf("shell", "input", "keyevent", "KEYCODE_APP_SWITCH"),
+                    icon = Icons.Default.Apps
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.power"),
+                    description = StringResources.get("operation.command.power.desc"),
+                    commandPreview = "shell input keyevent KEYCODE_POWER",
+                    arguments = listOf("shell", "input", "keyevent", "KEYCODE_POWER"),
+                    icon = Icons.Default.PowerSettingsNew
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.volume.up"),
+                    description = StringResources.get("operation.command.volume.up.desc"),
+                    commandPreview = "shell input keyevent KEYCODE_VOLUME_UP",
+                    arguments = listOf("shell", "input", "keyevent", "KEYCODE_VOLUME_UP"),
+                    icon = Icons.AutoMirrored.Filled.VolumeUp
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.volume.down"),
+                    description = StringResources.get("operation.command.volume.down.desc"),
+                    commandPreview = "shell input keyevent KEYCODE_VOLUME_DOWN",
+                    arguments = listOf("shell", "input", "keyevent", "KEYCODE_VOLUME_DOWN"),
+                    icon = Icons.AutoMirrored.Filled.VolumeDown
+                )
+            )
+        ),
+        DeviceCommandGroup(
+            title = StringResources.get("operation.command.group.diagnostics"),
+            actions = listOf(
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.vehicle.info"),
+                    description = StringResources.get("operation.command.vehicle.info.desc"),
+                    commandPreview = "shell getprop product/build info",
+                    arguments = listOf(
+                        "shell",
+                        "sh",
+                        "-c",
+                        "printf 'Model: '; getprop ro.product.model; printf 'Brand: '; getprop ro.product.brand; printf 'Android: '; getprop ro.build.version.release; printf 'Build: '; getprop ro.build.display.id"
+                    ),
+                    icon = Icons.Default.Info
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.display.info"),
+                    description = StringResources.get("operation.command.display.info.desc"),
+                    commandPreview = "shell wm size; wm density",
+                    arguments = listOf("shell", "sh", "-c", "wm size; wm density"),
+                    icon = Icons.Default.Build
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.current.focus"),
+                    description = StringResources.get("operation.command.current.focus.desc"),
+                    commandPreview = "shell dumpsys window focus",
+                    arguments = listOf(
+                        "shell",
+                        "sh",
+                        "-c",
+                        "dumpsys window | grep -E 'mCurrentFocus|mFocusedApp|mFocusedWindow'"
+                    ),
+                    icon = Icons.Default.BugReport
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.screenshot"),
+                    description = StringResources.get("operation.command.screenshot.desc"),
+                    commandPreview = "shell screencap -p /sdcard/Pictures/adbhub_screen.png",
+                    arguments = listOf(
+                        "shell",
+                        "sh",
+                        "-c",
+                        "mkdir -p /sdcard/Pictures; screencap -p /sdcard/Pictures/adbhub_screen.png; echo saved:/sdcard/Pictures/adbhub_screen.png"
+                    ),
+                    icon = Icons.Default.CameraAlt
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.open.settings"),
+                    description = StringResources.get("operation.command.open.settings.desc"),
+                    commandPreview = "shell am start -a android.settings.SETTINGS",
+                    arguments = listOf("shell", "am", "start", "-a", "android.settings.SETTINGS"),
+                    icon = Icons.Default.Settings
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.clear.logcat"),
+                    description = StringResources.get("operation.command.clear.logcat.desc"),
+                    commandPreview = "logcat -c",
+                    arguments = listOf("logcat", "-c"),
+                    icon = Icons.Default.DeleteSweep,
+                    destructive = true
+                )
+            )
+        ),
+        DeviceCommandGroup(
+            title = StringResources.get("operation.command.group.maintenance"),
+            actions = listOf(
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.root"),
+                    description = StringResources.get("operation.command.root.desc"),
+                    commandPreview = "root",
+                    arguments = listOf("root"),
+                    icon = Icons.Default.Security
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.remount"),
+                    description = StringResources.get("operation.command.remount.desc"),
+                    commandPreview = "remount",
+                    arguments = listOf("remount"),
+                    icon = Icons.Default.Build
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.disable.verity"),
+                    description = StringResources.get("operation.command.disable.verity.desc"),
+                    commandPreview = "disable-verity",
+                    arguments = listOf("disable-verity"),
+                    icon = Icons.Default.Security,
+                    destructive = true
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.enable.verity"),
+                    description = StringResources.get("operation.command.enable.verity.desc"),
+                    commandPreview = "enable-verity",
+                    arguments = listOf("enable-verity"),
+                    icon = Icons.Default.Security
+                )
+            )
+        ),
+        DeviceCommandGroup(
+            title = StringResources.get("operation.command.group.reboot"),
+            actions = listOf(
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.reboot"),
+                    description = StringResources.get("operation.command.reboot.desc"),
+                    commandPreview = "reboot",
+                    arguments = listOf("reboot"),
+                    icon = Icons.Default.RestartAlt,
+                    destructive = true
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.recovery"),
+                    description = StringResources.get("operation.command.recovery.desc"),
+                    commandPreview = "reboot recovery",
+                    arguments = listOf("reboot", "recovery"),
+                    icon = Icons.Default.RestartAlt,
+                    destructive = true
+                ),
+                DeviceCommandAction(
+                    title = StringResources.get("operation.command.bootloader"),
+                    description = StringResources.get("operation.command.bootloader.desc"),
+                    commandPreview = "reboot bootloader",
+                    arguments = listOf("reboot", "bootloader"),
+                    icon = Icons.Default.RestartAlt,
+                    destructive = true
+                )
+            )
+        )
+    )
 }
 
 @Composable
@@ -317,9 +859,8 @@ fun DeviceCommandsPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         )
 
         if (selectedDevice == null) {
-            Text(
-                text = StringResources.get("operation.select.device.first"),
-                color = MaterialTheme.colorScheme.error
+            DeviceRequiredPrompt(
+                modifier = Modifier.fillMaxWidth().height(220.dp)
             )
             return
         }
@@ -605,9 +1146,8 @@ fun AppManagementPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         )
 
         if (selectedDevice == null) {
-            Text(
-                text = StringResources.get("operation.select.device.first"),
-                color = MaterialTheme.colorScheme.error
+            DeviceRequiredPrompt(
+                modifier = Modifier.fillMaxWidth().height(220.dp)
             )
             return
         }
