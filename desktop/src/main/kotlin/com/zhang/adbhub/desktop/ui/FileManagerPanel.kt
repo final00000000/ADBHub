@@ -52,9 +52,9 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
         )
 
         if (selectedDevice == null) {
-            Text(
-                text = StringResources.get("file.manager.select.device.first"),
-                color = MaterialTheme.colorScheme.error
+            DeviceRequiredPrompt(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                description = StringResources.get("file.manager.select.device.first")
             )
             return
         }

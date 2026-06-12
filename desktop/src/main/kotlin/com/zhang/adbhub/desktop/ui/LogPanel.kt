@@ -3,19 +3,19 @@ package com.zhang.adbhub.desktop.ui
 import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,12 +40,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,6 +56,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -82,44 +83,15 @@ fun LogPanel(
     }
 
     Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
-        TabRow(
-            selectedTabIndex = selectedLogTab,
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.primary
-        ) {
-            Tab(
-                selected = selectedLogTab == 0,
-                onClick = {
-                    selectedLogTab = 0
-                    val config = AdbConfig.load()
-                    AdbConfig.save(config.copy(lastLogTab = 0))
-                },
-                text = { Text(StringResources.get("log.panel.operations"), style = MaterialTheme.typography.labelLarge) },
-                icon = {
-                    Icon(
-                        Icons.AutoMirrored.Filled.List,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            )
-            Tab(
-                selected = selectedLogTab == 1,
-                onClick = {
-                    selectedLogTab = 1
-                    val config = AdbConfig.load()
-                    AdbConfig.save(config.copy(lastLogTab = 1))
-                },
-                text = { Text(StringResources.get("log.panel.device.log"), style = MaterialTheme.typography.labelLarge) },
-                icon = {
-                    Icon(
-                        Icons.Default.PhoneAndroid,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            )
-        }
+        LogTabBar(
+            selectedLogTab = selectedLogTab,
+            onTabSelected = { tab ->
+                selectedLogTab = tab
+                val config = AdbConfig.load()
+                AdbConfig.save(config.copy(lastLogTab = tab))
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -127,6 +99,95 @@ fun LogPanel(
             when (selectedLogTab) {
                 0 -> OperationLogView(viewModel, modifier = Modifier.fillMaxSize())
                 1 -> DeviceLogView(selectedDevice, viewModel, isFullscreen, onToggleFullscreen, modifier = Modifier.fillMaxSize())
+            }
+        }
+    }
+}
+
+@Composable
+private fun LogTabBar(
+    selectedLogTab: Int,
+    onTabSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.height(76.dp)) {
+        Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            LogTabButton(
+                selected = selectedLogTab == 0,
+                label = StringResources.get("log.panel.operations"),
+                icon = Icons.AutoMirrored.Filled.List,
+                onClick = { onTabSelected(0) },
+                modifier = Modifier.weight(1f)
+            )
+            LogTabButton(
+                selected = selectedLogTab == 1,
+                label = StringResources.get("log.panel.device.log"),
+                icon = Icons.Default.PhoneAndroid,
+                onClick = { onTabSelected(1) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+        HorizontalDivider()
+    }
+}
+
+@Composable
+private fun LogTabButton(
+    selected: Boolean,
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val color = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = color,
+                maxLines = 1
+            )
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(3.dp)
+                .padding(horizontal = 8.dp)
+        ) {
+            if (selected) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.primary,
+                    shape = MaterialTheme.shapes.extraSmall,
+                    content = {}
+                )
             }
         }
     }
@@ -251,7 +312,6 @@ fun OperationLogItem(log: MainViewModel.OperationLog) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, isFullscreen: Boolean, onToggleFullscreen: () -> Unit, modifier: Modifier = Modifier) {
     val logLines by viewModel.logLines.collectAsState()
@@ -284,97 +344,115 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, isFullscree
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            FlowRow(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Button(
-                    onClick = onToggleFullscreen,
-                    modifier = Modifier.height(36.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(
-                        if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        if (isFullscreen) StringResources.get("log.panel.exit.fullscreen") else StringResources.get("log.panel.fullscreen"),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                Button(
-                    onClick = {
-                        if (isLogcatRunning) {
-                            viewModel.stopLogcat()
-                        } else {
-                            viewModel.startLogcat()
-                        }
-                    },
-                    enabled = selectedDevice != null,
-                    modifier = Modifier.height(36.dp),
-                    colors = if (isLogcatRunning) {
-                        ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    } else {
-                        ButtonDefaults.buttonColors()
+                    Button(
+                        onClick = onToggleFullscreen,
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(
+                            if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            if (isFullscreen) StringResources.get("log.panel.exit.fullscreen") else StringResources.get("log.panel.fullscreen"),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1
+                        )
                     }
-                ) {
-                    Icon(
-                        if (isLogcatRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        if (isLogcatRunning) StringResources.get("log.panel.stop") else StringResources.get("log.panel.start"),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                Button(
-                    onClick = { viewModel.clearLogcat() },
-                    enabled = selectedDevice != null && logLines.isNotEmpty(),
-                    modifier = Modifier.height(36.dp)
-                ) {
-                    Icon(Icons.Default.ClearAll, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(StringResources.get("log.panel.clear"), style = MaterialTheme.typography.bodySmall)
-                }
-                Button(
-                    onClick = {
-                        val dialog = FileDialog(Frame(), "Select export directory", FileDialog.LOAD)
-                        System.setProperty("apple.awt.fileDialogForDirectories", "true")
-                        dialog.isVisible = true
-                        System.setProperty("apple.awt.fileDialogForDirectories", "false")
-
-                        val selectedDir = dialog.directory
-                        if (selectedDir != null) {
-                            val timestamp = LocalDateTime.now()
-                                .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-                            val deviceSerial = selectedDevice?.serialNumber ?: "unknown"
-                            val outputFolder = File(selectedDir, "logs_${deviceSerial}_$timestamp")
-
-                            viewModel.exportLogs(outputFolder) { result ->
-                                exportStatus = result
+                    Button(
+                        onClick = {
+                            if (isLogcatRunning) {
+                                viewModel.stopLogcat()
+                            } else {
+                                viewModel.startLogcat()
                             }
+                        },
+                        enabled = selectedDevice != null,
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        colors = if (isLogcatRunning) {
+                            ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                        } else {
+                            ButtonDefaults.buttonColors()
                         }
-                    },
-                    enabled = selectedDevice != null && !isExecuting,
-                    modifier = Modifier.height(36.dp)
-                ) {
-                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(StringResources.get("log.panel.export"), style = MaterialTheme.typography.bodySmall)
+                    ) {
+                        Icon(
+                            if (isLogcatRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            if (isLogcatRunning) StringResources.get("log.panel.stop") else StringResources.get("log.panel.start"),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1
+                        )
+                    }
+                    Button(
+                        onClick = { viewModel.clearLogcat() },
+                        enabled = selectedDevice != null && logLines.isNotEmpty(),
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Default.ClearAll, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(StringResources.get("log.panel.clear"), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    }
                 }
-                Button(
-                    onClick = { showClearDeviceConfirm = true },
-                    enabled = selectedDevice != null && !isExecuting,
-                    modifier = Modifier.height(36.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(StringResources.get("log.panel.clear.device"), style = MaterialTheme.typography.bodySmall)
+                    Button(
+                        onClick = {
+                            val dialog = FileDialog(Frame(), "Select export directory", FileDialog.LOAD)
+                            System.setProperty("apple.awt.fileDialogForDirectories", "true")
+                            dialog.isVisible = true
+                            System.setProperty("apple.awt.fileDialogForDirectories", "false")
+
+                            val selectedDir = dialog.directory
+                            if (selectedDir != null) {
+                                val timestamp = LocalDateTime.now()
+                                    .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+                                val deviceSerial = selectedDevice?.serialNumber ?: "unknown"
+                                val outputFolder = File(selectedDir, "logs_${deviceSerial}_$timestamp")
+
+                                viewModel.exportLogs(outputFolder) { result ->
+                                    exportStatus = result
+                                }
+                            }
+                        },
+                        enabled = selectedDevice != null && !isExecuting,
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(StringResources.get("log.panel.export"), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    }
+                    Button(
+                        onClick = { showClearDeviceConfirm = true },
+                        enabled = selectedDevice != null && !isExecuting,
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(StringResources.get("log.panel.clear.device"), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    }
+                    Spacer(modifier = Modifier.weight(1f).height(36.dp))
                 }
             }
         }
@@ -455,7 +533,10 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, isFullscree
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             when {
-                selectedDevice == null -> EmptyLogMessage(StringResources.get("log.panel.select.device"))
+                selectedDevice == null -> DeviceRequiredPrompt(
+                    modifier = Modifier.fillMaxSize().padding(12.dp),
+                    description = StringResources.get("log.panel.select.device")
+                )
                 logLines.isEmpty() -> {
                     EmptyLogMessage(
                         if (isLogcatRunning) {
@@ -502,11 +583,11 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, isFullscree
             }
         }
 
-        if (exportStatus.isNotEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 32.dp, max = 60.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
+        Box(
+            modifier = Modifier.fillMaxWidth().height(60.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            if (exportStatus.isNotEmpty()) {
                 Text(
                     text = exportStatus,
                     style = MaterialTheme.typography.bodySmall,

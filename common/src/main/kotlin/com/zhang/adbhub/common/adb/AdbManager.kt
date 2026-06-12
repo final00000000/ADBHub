@@ -45,6 +45,11 @@ interface AdbManager {
 
     // 设备操作命令
     /**
+     * 执行通用 ADB 设备命令，arguments 不包含 adb、-s 和设备序列号。
+     */
+    suspend fun executeDeviceCommand(device: Device, arguments: List<String>): AdbResult<String>
+
+    /**
      * 以 root 权限重启 ADB
      */
     suspend fun executeRoot(device: Device): AdbResult<String>
