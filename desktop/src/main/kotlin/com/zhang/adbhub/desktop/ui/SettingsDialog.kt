@@ -19,6 +19,7 @@ import java.io.File
 fun SettingsDialog(
     onDismiss: (Boolean) -> Unit
 ) {
+    // Stable ViewModel instance - persists across recompositions but cleaned up on dialog dismiss
     val viewModel = remember { SettingsViewModel() }
     val customAdbPath by viewModel.customAdbPath.collectAsState()
     val deviceLogPath by viewModel.deviceLogPath.collectAsState()
@@ -29,6 +30,7 @@ fun SettingsDialog(
     val isScanning by viewModel.isScanning.collectAsState()
     var showScanConsent by remember { mutableStateOf(false) }
 
+    // Cleanup ViewModel when dialog is dismissed
     DisposableEffect(Unit) {
         onDispose {
             viewModel.cleanup()
@@ -175,19 +177,21 @@ fun SettingsDialog(
                             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                detectedPaths.forEach { path ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = path,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        TextButton(onClick = { viewModel.setCustomPath(path) }) {
-                                            Text(StringResources.get("settings.use"))
+                                detectedPaths.forEachIndexed { index, path ->
+                                    androidx.compose.runtime.key("detected-path-$index") {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = path,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            TextButton(onClick = { viewModel.setCustomPath(path) }) {
+                                                Text(StringResources.get("settings.use"))
+                                            }
                                         }
                                     }
                                 }

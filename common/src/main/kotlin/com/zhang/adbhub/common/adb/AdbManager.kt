@@ -19,9 +19,9 @@ interface AdbManager {
      * 推送 APK 到设备
      * @param device 目标设备
      * @param apkFile APK 文件
-     * @param targetPath 目标路径，默认为 /system/app/
+     * @param targetPath 目标路径
      */
-    suspend fun pushApk(device: Device, apkFile: File, targetPath: String = "/system/app/"): AdbResult<Unit>
+    suspend fun pushApk(device: Device, apkFile: File, targetPath: String): AdbResult<Unit>
 
     /**
      * 获取设备日志流
@@ -48,6 +48,11 @@ interface AdbManager {
      * 执行通用 ADB 设备命令，arguments 不包含 adb、-s 和设备序列号。
      */
     suspend fun executeDeviceCommand(device: Device, arguments: List<String>): AdbResult<String>
+
+    /**
+     * 截取设备当前屏幕并写入本地 PNG 文件。
+     */
+    suspend fun captureScreenshot(device: Device, outputFile: File): AdbResult<File>
 
     /**
      * 以 root 权限重启 ADB
@@ -87,8 +92,9 @@ interface AdbManager {
     // 应用管理命令
     /**
      * 启动指定应用
+     * @param activityName Activity 名称，为空时使用 monkey 启动默认 Activity
      */
-    suspend fun startApp(device: Device, packageName: String, activityName: String): AdbResult<String>
+    suspend fun startApp(device: Device, packageName: String, activityName: String?): AdbResult<String>
 
     /**
      * 获取应用信息

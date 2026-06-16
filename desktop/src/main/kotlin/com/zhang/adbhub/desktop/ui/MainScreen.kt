@@ -1,31 +1,34 @@
 package com.zhang.adbhub.desktop.ui
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.zhang.adbhub.common.config.AdbPathDetector
 import com.zhang.adbhub.common.config.AdbConfig
+import com.zhang.adbhub.common.config.AdbPathDetector
 import com.zhang.adbhub.desktop.viewmodel.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen() {
     val viewModel = remember { MainViewModel() }
-    val devices by viewModel.devices.collectAsState()
-    val selectedDevice by viewModel.selectedDevice.collectAsState()
-    val selectedTab by viewModel.selectedTab.collectAsState()
-    val adbStatus by viewModel.adbStatus.collectAsState()
-    val deviceDiagnostics by viewModel.deviceDiagnostics.collectAsState()
 
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showSetupGuide by remember { mutableStateOf(false) }
     var isLogFullscreen by remember { mutableStateOf(false) }
 
-    // Check ADB availability on startup
     LaunchedEffect(Unit) {
         val config = AdbConfig.load()
         val adbPath = AdbPathDetector.getValidAdbPath(config.customAdbPath)
@@ -42,54 +45,37 @@ fun MainScreen() {
         }
     }
 
-    Row(modifier = Modifier.fillMaxSize()) {
-        if (isLogFullscreen) {
-            // 全屏日志模式
-            LogPanel(
-                selectedDevice = selectedDevice,
+    if (isLogFullscreen) {
+        FullscreenLogPanelHost(
+            viewModel = viewModel,
+            onToggleFullscreen = { isLogFullscreen = false },
+            modifier = Modifier.fillMaxSize()
+        )
+    } else {
+        Row(modifier = Modifier.fillMaxSize()) {
+            DeviceListPanelHost(
                 viewModel = viewModel,
-                isFullscreen = true,
-                onToggleFullscreen = { isLogFullscreen = false },
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            // 左栏：设备列表
-            DeviceListPanel(
-                devices = devices,
-                selectedDevice = selectedDevice,
-                onDeviceSelected = { viewModel.selectDevice(it) },
-                onRefresh = { viewModel.refreshDevices() },
                 onSettingsClick = { showSettingsDialog = true },
-                adbStatus = adbStatus,
-                deviceDiagnostics = deviceDiagnostics,
                 modifier = Modifier.width(280.dp).fillMaxHeight()
             )
 
             VerticalDivider(modifier = Modifier.width(1.dp).fillMaxHeight())
 
-            // 中栏：操作区
-            OperationPanel(
-                selectedDevice = selectedDevice,
-                selectedTab = selectedTab,
-                onTabSelected = { viewModel.selectTab(it) },
+            OperationPanelHost(
                 viewModel = viewModel,
                 modifier = Modifier.weight(1f).fillMaxHeight()
             )
 
             VerticalDivider(modifier = Modifier.width(1.dp).fillMaxHeight())
 
-            // 右栏：日志区
-            LogPanel(
-                selectedDevice = selectedDevice,
+            LogPanelHost(
                 viewModel = viewModel,
-                isFullscreen = false,
                 onToggleFullscreen = { isLogFullscreen = true },
                 modifier = Modifier.width(450.dp).fillMaxHeight()
             )
         }
     }
 
-    // Dialogs
     if (showSettingsDialog) {
         SettingsDialog(
             onDismiss = { shouldRefresh ->
@@ -110,4 +96,78 @@ fun MainScreen() {
             }
         )
     }
+}
+
+@Composable
+private fun DeviceListPanelHost(
+    viewModel: MainViewModel,
+    onSettingsClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val devices by viewModel.devices.collectAsState()
+    val selectedDevice by viewModel.selectedDevice.collectAsState()
+    val adbStatus by viewModel.adbStatus.collectAsState()
+    val deviceDiagnostics by viewModel.deviceDiagnostics.collectAsState()
+
+    DeviceListPanel(
+        devices = devices,
+        selectedDevice = selectedDevice,
+        onDeviceSelected = { viewModel.selectDevice(it) },
+        onRefresh = { viewModel.refreshDevices() },
+        onSettingsClick = onSettingsClick,
+        adbStatus = adbStatus,
+        deviceDiagnostics = deviceDiagnostics,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun OperationPanelHost(
+    viewModel: MainViewModel,
+    modifier: Modifier = Modifier
+) {
+    val selectedDevice by viewModel.selectedDevice.collectAsState()
+    val selectedTab by viewModel.selectedTab.collectAsState()
+
+    OperationPanel(
+        selectedDevice = selectedDevice,
+        selectedTab = selectedTab,
+        onTabSelected = { viewModel.selectTab(it) },
+        viewModel = viewModel,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun LogPanelHost(
+    viewModel: MainViewModel,
+    onToggleFullscreen: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val selectedDevice by viewModel.selectedDevice.collectAsState()
+
+    LogPanel(
+        selectedDevice = selectedDevice,
+        viewModel = viewModel,
+        isFullscreen = false,
+        onToggleFullscreen = onToggleFullscreen,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun FullscreenLogPanelHost(
+    viewModel: MainViewModel,
+    onToggleFullscreen: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val selectedDevice by viewModel.selectedDevice.collectAsState()
+
+    LogPanel(
+        selectedDevice = selectedDevice,
+        viewModel = viewModel,
+        isFullscreen = true,
+        onToggleFullscreen = onToggleFullscreen,
+        modifier = modifier
+    )
 }

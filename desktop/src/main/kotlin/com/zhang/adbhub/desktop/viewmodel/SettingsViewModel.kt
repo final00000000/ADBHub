@@ -49,6 +49,7 @@ class SettingsViewModel {
                 _statusMessage.value = StringResources.get("status.scanning.drives")
             }
             try {
+                AdbPathDetector.clearCache()
                 val paths = AdbPathDetector.detectPossiblePaths()
                 val validPaths = paths.filter { path ->
                     try {
@@ -98,6 +99,7 @@ class SettingsViewModel {
     fun saveConfig() {
         val config = buildConfigFromInputs()
         AdbConfig.save(config)
+        AdbPathDetector.clearCache()
         checkCurrentAdb()
         _statusMessage.value = StringResources.get("status.config.saved")
     }
@@ -105,6 +107,7 @@ class SettingsViewModel {
     fun saveConfigIfAdbValid(onValid: () -> Unit) {
         scope.launch(Dispatchers.IO) {
             val config = buildConfigFromInputs()
+            AdbPathDetector.clearCache()
             val validPath = AdbPathDetector.getValidAdbPath(config.customAdbPath)
 
             if (validPath == null) {
@@ -133,6 +136,7 @@ class SettingsViewModel {
     fun testConnection() {
         scope.launch(Dispatchers.IO) {
             val path = _customAdbPath.value.ifBlank { null }
+            AdbPathDetector.clearCache()
             val validPath = AdbPathDetector.getValidAdbPath(path)
 
             if (validPath != null) {
@@ -155,6 +159,7 @@ class SettingsViewModel {
     fun resetToDefault() {
         _customAdbPath.value = ""
         AdbConfig.save(AdbConfig())
+        AdbPathDetector.clearCache()
         checkCurrentAdb()
         _statusMessage.value = StringResources.get("status.reset.success")
     }

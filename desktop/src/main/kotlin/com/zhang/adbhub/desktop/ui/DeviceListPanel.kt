@@ -107,7 +107,10 @@ fun DeviceListPanel(
                     }
 
                     LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                        items(devices) { device ->
+                        items(
+                            items = devices,
+                            key = { device -> device.serialNumber }
+                        ) { device ->
                             DeviceItem(
                                 device = device,
                                 isSelected = device == selectedDevice,
@@ -165,7 +168,10 @@ private fun DeviceDiagnosticsPanel(
                 )
             }
         } else {
-            items(diagnostics) { diagnostic ->
+            items(
+                items = diagnostics,
+                key = { diagnostic -> "${diagnostic.title}_${diagnostic.status}" }
+            ) { diagnostic ->
                 DeviceDiagnosticRow(diagnostic)
             }
         }

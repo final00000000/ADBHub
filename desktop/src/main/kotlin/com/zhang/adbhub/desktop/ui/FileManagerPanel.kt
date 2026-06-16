@@ -3,7 +3,18 @@ package com.zhang.adbhub.desktop.ui
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -11,43 +22,73 @@ import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.VerticalAlignTop
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zhang.adbhub.common.model.Device
 import com.zhang.adbhub.common.model.FileInfo
-import com.zhang.adbhub.desktop.viewmodel.MainViewModel
 import com.zhang.adbhub.desktop.utils.StringResources
+import com.zhang.adbhub.desktop.viewmodel.MainViewModel
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
+
+private const val ROOT_PATH = "/"
 
 @Composable
 fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
     val currentPath by viewModel.currentPath.collectAsState()
     val fileList by viewModel.fileList.collectAsState()
     val isExecuting by viewModel.isExecuting.collectAsState()
+
+    var selectedFile by remember(currentPath) { mutableStateOf<FileInfo?>(null) }
     var resultText by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var fileToDelete by remember { mutableStateOf<FileInfo?>(null) }
 
-    // 当设备改变或首次加载时，导航到默认路径
-    LaunchedEffect(selectedDevice) {
-        if (selectedDevice != null && fileList.isEmpty()) {
-            viewModel.navigateToPath(currentPath)
+    LaunchedEffect(selectedDevice?.serialNumber) {
+        if (selectedDevice != null && currentPath.isBlank()) {
+            viewModel.navigateToPath(ROOT_PATH)
         }
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        modifier = Modifier.fillMaxSize().padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            text = StringResources.get("file.manager.title"),
+            text = StringResources.get("file.manager.device.explorer"),
             style = MaterialTheme.typography.titleMedium
         )
 
@@ -56,169 +97,117 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 description = StringResources.get("file.manager.select.device.first")
             )
-            return
+            return@Column
         }
 
-        Text(
-            text = StringResources.get("file.manager.target.device", selectedDevice.model ?: selectedDevice.serialNumber),
-            style = MaterialTheme.typography.bodyMedium
-        )
+        DeviceExplorerHeader(selectedDevice = selectedDevice)
 
-        HorizontalDivider()
-
-        // 路径导航栏
-        PathNavigationBar(
-            currentPath = currentPath,
-            onNavigate = { path ->
-                viewModel.navigateToPath(path)
+        DeviceExplorerToolbar(
+            currentPath = currentPath.ifBlank { ROOT_PATH },
+            selectedFile = selectedFile,
+            isExecuting = isExecuting,
+            onHome = {
+                viewModel.navigateToPath(ROOT_PATH)
                 resultText = ""
             },
-            isExecuting = isExecuting
-        )
-
-        // 操作按钮区 - 固定高度
-        Row(
-            modifier = Modifier.fillMaxWidth().height(48.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = {
-                    val dialog = FileDialog(Frame(), StringResources.get("file.manager.select.file.upload"), FileDialog.LOAD)
+            onParent = {
+                viewModel.navigateToPath(parentPath(currentPath))
+                resultText = ""
+            },
+            onRefresh = {
+                viewModel.navigateToPath(currentPath.ifBlank { ROOT_PATH })
+                resultText = StringResources.get("file.manager.directory.refreshed")
+            },
+            onUpload = {
+                val dialog = FileDialog(Frame(), StringResources.get("file.manager.select.file.upload"), FileDialog.LOAD)
+                dialog.isVisible = true
+                val file = dialog.file
+                val dir = dialog.directory
+                if (file != null && dir != null) {
+                    val localFile = File(dir, file)
+                    viewModel.pushFileToDevice(localFile, childPath(currentPath.ifBlank { ROOT_PATH }, file)) { result ->
+                        resultText = result
+                    }
+                }
+            },
+            onDownload = {
+                selectedFile?.let { fileInfo ->
+                    val dialog = FileDialog(Frame(), StringResources.get("file.manager.save.file"), FileDialog.SAVE)
+                    dialog.file = fileInfo.name
                     dialog.isVisible = true
                     val file = dialog.file
                     val dir = dialog.directory
                     if (file != null && dir != null) {
-                        val localFile = File(dir, file)
-                        val remotePath = if (currentPath.endsWith("/")) {
-                            "$currentPath$file"
-                        } else {
-                            "$currentPath/$file"
-                        }
-                        viewModel.pushFileToDevice(localFile, remotePath) { result ->
+                        viewModel.pullFile(fileInfo.fullPath, File(dir, file)) { result ->
                             resultText = result
                         }
                     }
-                },
-                enabled = !isExecuting,
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            ) {
-                Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(StringResources.get("file.manager.upload.file"))
-            }
+                }
+            },
+            onDelete = { showDeleteDialog = true }
+        )
 
-            Button(
-                onClick = {
-                    viewModel.navigateToPath(currentPath)
-                    resultText = StringResources.get("file.manager.directory.refreshed")
-                },
-                enabled = !isExecuting,
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            ) {
-                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(StringResources.get("file.manager.refresh"))
-            }
-        }
-
-        // 文件列表使用剩余高度，避免挤压底部结果区域
         OutlinedCard(
-            modifier = Modifier.fillMaxWidth().weight(1f).heightIn(min = 180.dp),
-            shape = MaterialTheme.shapes.medium
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            shape = MaterialTheme.shapes.extraSmall
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                if (fileList.isEmpty()) {
-                    if (isExecuting) {
+                when {
+                    isExecuting && fileList.isEmpty() -> {
                         CircularProgressIndicator(
                             modifier = Modifier.align(Alignment.Center).size(32.dp)
                         )
-                    } else {
-                    Text(
-                        text = StringResources.get("file.manager.directory.empty.or.inaccessible"),
-                        modifier = Modifier.align(Alignment.Center).padding(16.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     }
-                } else {
-                    FileListContent(
-                        fileList = fileList,
-                        currentPath = currentPath,
-                        onNavigate = { path ->
-                            viewModel.navigateToPath(path)
-                            resultText = ""
-                        },
-                        onDownload = { fileInfo ->
-                            val dialog = FileDialog(Frame(), StringResources.get("file.manager.save.file"), FileDialog.SAVE)
-                            dialog.file = fileInfo.name
-                            dialog.isVisible = true
-                            val file = dialog.file
-                            val dir = dialog.directory
-                            if (file != null && dir != null) {
-                                val localFile = File(dir, file)
-                                viewModel.pullFile(fileInfo.fullPath, localFile) { result ->
-                                    resultText = result
-                                }
-                            }
-                        },
-                        onDelete = { fileInfo ->
-                            fileToDelete = fileInfo
-                            showDeleteDialog = true
-                        },
-                        isExecuting = isExecuting
-                    )
-                }
-            }
-        }
-
-        // 结果显示固定可见，内容过长时内部滚动
-        OutlinedCard(
-            modifier = Modifier.fillMaxWidth().height(120.dp),
-            shape = MaterialTheme.shapes.medium
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = StringResources.get("file.manager.operation.result"),
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Box(modifier = Modifier.fillMaxSize()) {
-                    if (resultText.isNotEmpty()) {
+                    fileList.isEmpty() -> {
                         Text(
-                            text = resultText,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.verticalScroll(rememberScrollState())
-                        )
-                    } else {
-                        Text(
-                            text = StringResources.get("file.manager.waiting.for.operation"),
-                            style = MaterialTheme.typography.bodySmall,
+                            text = StringResources.get("file.manager.directory.empty.or.inaccessible"),
+                            modifier = Modifier.align(Alignment.Center).padding(16.dp),
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    else -> {
+                        DeviceExplorerTable(
+                            fileList = fileList,
+                            selectedFile = selectedFile,
+                            onSelect = { selectedFile = it },
+                            onOpenDirectory = { fileInfo ->
+                                selectedFile = null
+                                resultText = ""
+                                viewModel.navigateToPath(fileInfo.fullPath)
+                            },
+                            isExecuting = isExecuting
+                        )
+                    }
                 }
             }
         }
+
+        FileActionResult(resultText = resultText)
     }
 
-    // 删除确认对话框
-    if (showDeleteDialog && fileToDelete != null) {
+    if (showDeleteDialog && selectedFile != null) {
+        val fileInfo = selectedFile!!
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text(StringResources.get("file.manager.confirm.delete")) },
             text = {
-                Text(StringResources.get("file.manager.delete.confirmation.message", fileToDelete!!.name, if (fileToDelete!!.isDirectory) StringResources.get("file.manager.delete.directory.warning") else ""))
+                Text(
+                    StringResources.get(
+                        "file.manager.delete.confirmation.message",
+                        fileInfo.name,
+                        if (fileInfo.isDirectory) StringResources.get("file.manager.delete.directory.warning") else ""
+                    )
+                )
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        fileToDelete?.let { file ->
-                            viewModel.deleteFile(file.fullPath) { result ->
-                                resultText = result
-                            }
+                        viewModel.deleteFile(fileInfo.fullPath) { result ->
+                            resultText = result
+                            selectedFile = null
                         }
                         showDeleteDialog = false
-                        fileToDelete = null
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
@@ -228,10 +217,7 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showDeleteDialog = false
-                    fileToDelete = null
-                }) {
+                TextButton(onClick = { showDeleteDialog = false }) {
                     Text(StringResources.get("settings.cancel"))
                 }
             }
@@ -240,105 +226,96 @@ fun FileManagerPanel(selectedDevice: Device?, viewModel: MainViewModel) {
 }
 
 @Composable
-fun PathNavigationBar(
-    currentPath: String,
-    onNavigate: (String) -> Unit,
-    isExecuting: Boolean
-) {
-    var editablePath by remember(currentPath) { mutableStateOf(currentPath) }
-    var isPathValid by remember { mutableStateOf(true) }
-    var errorMessage by remember { mutableStateOf("") }
-
-    Column(modifier = Modifier.fillMaxWidth()) {
+private fun DeviceExplorerHeader(selectedDevice: Device) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(38.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.extraSmall
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // 上级目录按钮
-            IconButton(
-                onClick = {
-                    val parentPath = currentPath.substringBeforeLast("/", "/")
-                    if (parentPath.isNotEmpty()) {
-                        onNavigate(parentPath.ifEmpty { "/" })
-                        errorMessage = ""
-                    }
-                },
-                enabled = currentPath != "/" && !isExecuting,
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回上级")
-            }
-
-            // 可编辑路径输入框
-            OutlinedTextField(
-                value = editablePath,
-                onValueChange = {
-                    editablePath = it
-                    isPathValid = it.isNotBlank() && it.startsWith("/")
-                    if (!isPathValid && it.isNotBlank()) {
-                        errorMessage = StringResources.get("file.manager.path.must.start.slash")
-                    } else {
-                        errorMessage = ""
-                    }
-                },
-                modifier = Modifier.weight(1f).height(56.dp),
-                singleLine = true,
-                enabled = !isExecuting,
-                isError = !isPathValid && editablePath.isNotBlank(),
-                leadingIcon = {
-                    Icon(Icons.Default.Folder, contentDescription = null)
-                },
-                placeholder = {
-                    Text(StringResources.get("file.manager.path.placeholder"), style = MaterialTheme.typography.bodySmall)
-                },
-                textStyle = MaterialTheme.typography.bodyMedium,
-                colors = OutlinedTextFieldDefaults.colors(
-                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                    disabledBorderColor = MaterialTheme.colorScheme.outline,
-                    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = selectedDevice.model ?: selectedDevice.serialNumber,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-
-            // 跳转按钮
-            Button(
-                onClick = {
-                    if (isPathValid && editablePath.isNotBlank()) {
-                        onNavigate(editablePath.trim())
-                        errorMessage = ""
-                    }
-                },
-                enabled = !isExecuting && isPathValid && editablePath.isNotBlank(),
-                modifier = Modifier.height(48.dp).width(80.dp)
-            ) {
-                Text(StringResources.get("file.manager.navigate"))
-            }
-        }
-
-        // 固定高度的错误提示区域，防止 UI 跳动
-        Box(
-            modifier = Modifier.fillMaxWidth().height(24.dp).padding(start = 56.dp, top = 4.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            if (errorMessage.isNotEmpty()) {
-                Text(
-                    text = errorMessage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
         }
     }
 }
 
 @Composable
-fun FileListContent(
-    fileList: List<FileInfo>,
+private fun DeviceExplorerToolbar(
     currentPath: String,
-    onNavigate: (String) -> Unit,
-    onDownload: (FileInfo) -> Unit,
-    onDelete: (FileInfo) -> Unit,
+    selectedFile: FileInfo?,
+    isExecuting: Boolean,
+    onHome: () -> Unit,
+    onParent: () -> Unit,
+    onRefresh: () -> Unit,
+    onUpload: () -> Unit,
+    onDownload: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = currentPath,
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) },
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth().height(36.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ExplorerToolButton(Icons.Default.Home, StringResources.get("file.manager.root.directories"), !isExecuting, onHome)
+            ExplorerToolButton(Icons.Default.VerticalAlignTop, StringResources.get("file.manager.parent.directory"), !isExecuting && currentPath != ROOT_PATH, onParent)
+            ExplorerToolButton(Icons.Default.Upload, StringResources.get("file.manager.upload.file"), !isExecuting, onUpload)
+            ExplorerToolButton(Icons.Default.Download, StringResources.get("file.manager.download"), !isExecuting && selectedFile != null, onDownload)
+            ExplorerToolButton(Icons.Default.Delete, StringResources.get("file.manager.delete"), !isExecuting && selectedFile != null, onDelete)
+            ExplorerToolButton(Icons.Default.Refresh, StringResources.get("file.manager.refresh"), !isExecuting, onRefresh)
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = selectedFile?.let { StringResources.get("file.manager.selected.item", it.name) }
+                    ?: StringResources.get("file.manager.no.selection"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExplorerToolButton(
+    icon: ImageVector,
+    contentDescription: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(34.dp)
+    ) {
+        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+private fun DeviceExplorerTable(
+    fileList: List<FileInfo>,
+    selectedFile: FileInfo?,
+    onSelect: (FileInfo) -> Unit,
+    onOpenDirectory: (FileInfo) -> Unit,
     isExecuting: Boolean
 ) {
     val listState = rememberLazyListState()
@@ -348,46 +325,20 @@ fun FileListContent(
             state = listState,
             modifier = Modifier.fillMaxSize().padding(end = 12.dp)
         ) {
-            // 表头
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = StringResources.get("file.manager.name"),
-                        modifier = Modifier.weight(2f),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    Text(
-                        text = StringResources.get("file.manager.size"),
-                        modifier = Modifier.width(80.dp),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    Text(
-                        text = StringResources.get("file.manager.permissions"),
-                        modifier = Modifier.width(100.dp),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    Text(
-                        text = StringResources.get("file.manager.modified.time"),
-                        modifier = Modifier.width(120.dp),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    Spacer(modifier = Modifier.width(120.dp)) // 操作按钮空间
-                }
+                DeviceExplorerHeaderRow()
             }
 
-            items(fileList) { fileInfo ->
-                FileListItem(
+            items(
+                items = fileList.sortedWith(compareByDescending<FileInfo> { it.isDirectory }.thenBy { it.name.lowercase() }),
+                key = { it.fullPath }
+            ) { fileInfo ->
+                DeviceExplorerRow(
                     fileInfo = fileInfo,
-                    onNavigate = onNavigate,
-                    onDownload = onDownload,
-                    onDelete = onDelete,
-                    isExecuting = isExecuting
+                    selected = selectedFile?.fullPath == fileInfo.fullPath,
+                    enabled = !isExecuting,
+                    onSelect = onSelect,
+                    onOpenDirectory = onOpenDirectory
                 )
                 HorizontalDivider()
             }
@@ -401,101 +352,105 @@ fun FileListContent(
 }
 
 @Composable
-fun FileListItem(
-    fileInfo: FileInfo,
-    onNavigate: (String) -> Unit,
-    onDownload: (FileInfo) -> Unit,
-    onDelete: (FileInfo) -> Unit,
-    isExecuting: Boolean
-) {
+private fun DeviceExplorerHeaderRow() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = fileInfo.isDirectory && !isExecuting) {
-                if (fileInfo.isDirectory) {
-                    onNavigate(fileInfo.fullPath)
-                }
-            }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .height(34.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 图标 + 名称
+        Text(StringResources.get("file.manager.name"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
+        Text(StringResources.get("file.manager.permissions"), modifier = Modifier.width(112.dp), style = MaterialTheme.typography.labelMedium)
+        Text(StringResources.get("file.manager.modified.time"), modifier = Modifier.width(136.dp), style = MaterialTheme.typography.labelMedium)
+        Text(StringResources.get("file.manager.size"), modifier = Modifier.width(72.dp), style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+private fun DeviceExplorerRow(
+    fileInfo: FileInfo,
+    selected: Boolean,
+    enabled: Boolean,
+    onSelect: (FileInfo) -> Unit,
+    onOpenDirectory: (FileInfo) -> Unit
+) {
+    val background = if (selected) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(32.dp)
+            .background(background)
+            .clickable(enabled = enabled) { onSelect(fileInfo) }
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Row(
-            modifier = Modifier.weight(2f),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (fileInfo.isDirectory) {
+                IconButton(
+                    onClick = { onOpenDirectory(fileInfo) },
+                    enabled = enabled,
+                    modifier = Modifier.size(26.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = StringResources.get("file.manager.folder.open"), modifier = Modifier.size(18.dp))
+                }
+            } else {
+                Spacer(modifier = Modifier.width(26.dp))
+            }
+
             Icon(
                 imageVector = if (fileInfo.isDirectory) Icons.Default.Folder else Icons.Default.Description,
                 contentDescription = null,
                 tint = if (fileInfo.isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = fileInfo.name,
                 style = MaterialTheme.typography.bodySmall,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
 
-        // 大小
-        Text(
-            text = fileInfo.getFormattedSize(),
-            modifier = Modifier.width(80.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text(fileInfo.permissions, modifier = Modifier.width(112.dp), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+        Text(fileInfo.modifiedTime, modifier = Modifier.width(136.dp), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+        Text(fileInfo.getFormattedSize(), modifier = Modifier.width(72.dp), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+    }
+}
 
-        // 权限
-        Text(
-            text = fileInfo.permissions,
-            modifier = Modifier.width(100.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        // 修改时间
-        Text(
-            text = fileInfo.modifiedTime,
-            modifier = Modifier.width(120.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        // 操作按钮
-        Row(
-            modifier = Modifier.width(120.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            if (!fileInfo.isDirectory) {
-                IconButton(
-                    onClick = { onDownload(fileInfo) },
-                    enabled = !isExecuting,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Download,
-                        contentDescription = "下载",
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            } else {
-                Spacer(modifier = Modifier.size(32.dp))
-            }
-
-            IconButton(
-                onClick = { onDelete(fileInfo) },
-                enabled = !isExecuting,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "删除",
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
+@Composable
+private fun FileActionResult(resultText: String) {
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth().height(82.dp),
+        shape = MaterialTheme.shapes.extraSmall
+    ) {
+        Box(modifier = Modifier.fillMaxSize().padding(10.dp)) {
+            Text(
+                text = resultText.ifBlank { StringResources.get("file.manager.waiting.for.operation") },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (resultText.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            )
         }
     }
+}
+
+private fun parentPath(path: String): String {
+    val normalized = path.ifBlank { ROOT_PATH }.trimEnd('/')
+    if (normalized.isBlank() || normalized == ROOT_PATH) return ROOT_PATH
+    return normalized.substringBeforeLast('/', ROOT_PATH).ifBlank { ROOT_PATH }
+}
+
+private fun childPath(parent: String, childName: String): String {
+    return if (parent.endsWith('/')) "$parent$childName" else "$parent/$childName"
 }

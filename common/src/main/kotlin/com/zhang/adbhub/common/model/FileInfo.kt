@@ -11,6 +11,13 @@ data class FileInfo(
     val modifiedTime: String,
     val fullPath: String
 ) {
+    private companion object {
+        const val BYTE_UNIT = 1024
+        const val KILOBYTE = BYTE_UNIT
+        const val MEGABYTE = KILOBYTE * BYTE_UNIT
+        const val GIGABYTE = MEGABYTE * BYTE_UNIT
+    }
+
     /**
      * 格式化文件大小
      */
@@ -18,10 +25,10 @@ data class FileInfo(
         if (isDirectory) return "-"
 
         return when {
-            size < 1024 -> "$size B"
-            size < 1024 * 1024 -> "${size / 1024} KB"
-            size < 1024 * 1024 * 1024 -> "${size / (1024 * 1024)} MB"
-            else -> "${size / (1024 * 1024 * 1024)} GB"
+            size < KILOBYTE -> "$size B"
+            size < MEGABYTE -> "${size / KILOBYTE} KB"
+            size < GIGABYTE -> "${size / MEGABYTE} MB"
+            else -> "${size / GIGABYTE} GB"
         }
     }
 }

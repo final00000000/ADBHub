@@ -30,6 +30,10 @@ class DadbManager : AdbManager {
         return AdbPathDetector.getValidAdbPath(config.customAdbPath)
     }
 
+    private fun getConfiguredDeviceLogPath(): String? {
+        return AdbConfig.load().deviceLogPath?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
     override suspend fun getDevices(): AdbResult<List<Device>> = withContext(Dispatchers.IO) {
         try {
             val adbPath = getAdbPath()
@@ -163,8 +167,8 @@ class DadbManager : AdbManager {
                 val adbPath = getAdbPath()
                     ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
-                val config = AdbConfig.load()
-                val deviceLogPath = config.deviceLogPath ?: "/sdcard/"
+                val deviceLogPath = getConfiguredDeviceLogPath()
+                    ?: return@withContext AdbResult.Error(StringResources.get("common.adb.device.log.path.required"))
 
                 // 确保输出文件夹存在
                 if (!outputFolder.exists()) {
@@ -180,12 +184,12 @@ class DadbManager : AdbManager {
                 val exitCode = process.waitFor()
 
                 if (exitCode == 0) {
-                    AdbResult.Success("日志文件夹导出成功: ${outputFolder.absolutePath}\n$output")
+                    AdbResult.Success(StringResources.get("common.adb.export.success.with.output", outputFolder.absolutePath, output))
                 } else {
                     AdbResult.Error(StringResources.get("common.adb.export.failed", error.ifEmpty { output }))
                 }
             } catch (e: Exception) {
-                AdbResult.Error("Failed to export logs: ${e.message}", e)
+                AdbResult.Error(StringResources.get("common.adb.export.failed", e.message ?: ""), e)
             }
         }
 
@@ -194,8 +198,8 @@ class DadbManager : AdbManager {
             val adbPath = getAdbPath()
                 ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
-            val config = AdbConfig.load()
-            val deviceLogPath = config.deviceLogPath ?: "/sdcard/"
+            val deviceLogPath = getConfiguredDeviceLogPath()
+                ?: return@withContext AdbResult.Error(StringResources.get("common.adb.device.log.path.required"))
             val clearPath = if (deviceLogPath.endsWith("/")) "${deviceLogPath}*" else "$deviceLogPath/*"
 
             val processBuilder = ProcessBuilder(
@@ -236,10 +240,53 @@ class DadbManager : AdbManager {
                 if (exitCode == 0) {
                     AdbResult.Success(output.ifBlank { StringResources.get("common.adb.command.success") })
                 } else {
-                    AdbResult.Error(StringResources.get("common.adb.command.failed", error.ifBlank { output }))
+                    AdbResult.Error(
+                        AdbCommandFailureFormatter.format(
+                            command = (listOf("adb", "-s", device.serialNumber) + arguments).joinToString(" "),
+                            exitCode = exitCode,
+                            stdout = output,
+                            stderr = error,
+                            fallbackMessage = StringResources.get("common.adb.command.failed", error.ifBlank { output })
+                        )
+                    )
                 }
             } catch (e: Exception) {
                 AdbResult.Error(StringResources.get("common.adb.command.failed", e.message ?: ""), e)
+            }
+        }
+
+    override suspend fun captureScreenshot(device: Device, outputFile: File): AdbResult<File> =
+        withContext(Dispatchers.IO) {
+            try {
+                val adbPath = getAdbPath()
+                    ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
+
+                outputFile.parentFile?.mkdirs()
+                val processBuilder = ProcessBuilder(
+                    adbPath, "-s", device.serialNumber, "exec-out", "screencap", "-p"
+                )
+                val process = processBuilder.start()
+                outputFile.outputStream().use { output ->
+                    process.inputStream.copyTo(output)
+                }
+                val error = process.errorStream.bufferedReader().use { it.readText() }
+                val exitCode = process.waitFor()
+
+                if (exitCode == 0 && outputFile.length() > 0L) {
+                    AdbResult.Success(outputFile)
+                } else {
+                    outputFile.delete()
+                    AdbResult.Error(
+                        StringResources.get(
+                            "common.adb.screenshot.failed",
+                            exitCode,
+                            error.ifBlank { StringResources.get("common.adb.screenshot.empty.output") }
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                outputFile.delete()
+                AdbResult.Error(StringResources.get("common.adb.screenshot.failed", -1, e.message ?: ""), e)
             }
         }
 
@@ -278,7 +325,15 @@ class DadbManager : AdbManager {
             if (exitCode == 0) {
                 AdbResult.Success(output.ifEmpty { StringResources.get("common.adb.remount.success") })
             } else {
-                AdbResult.Error(StringResources.get("common.adb.remount.failed", error.ifEmpty { output }))
+                AdbResult.Error(
+                    AdbCommandFailureFormatter.format(
+                        command = "adb -s ${device.serialNumber} remount",
+                        exitCode = exitCode,
+                        stdout = output,
+                        stderr = error,
+                        fallbackMessage = StringResources.get("common.adb.remount.failed", error.ifEmpty { output })
+                    )
+                )
             }
         } catch (e: Exception) {
             AdbResult.Error(StringResources.get("common.adb.execute.remount.failed", e.message ?: ""), e)
@@ -359,7 +414,7 @@ class DadbManager : AdbManager {
             var exitCode = process.waitFor()
 
             if (exitCode == 0) {
-                return@withContext AdbResult.Success("已返回桌面")
+                return@withContext AdbResult.Success(StringResources.get("common.adb.home.success"))
             }
 
             // 如果失败，尝试 am start 方式
@@ -374,12 +429,12 @@ class DadbManager : AdbManager {
             exitCode = process.waitFor()
 
             if (exitCode == 0) {
-                AdbResult.Success("已返回桌面")
+                AdbResult.Success(StringResources.get("common.adb.home.success"))
             } else {
-                AdbResult.Error("返回桌面失败: ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.home.failed", error.ifEmpty { output }))
             }
         } catch (e: Exception) {
-            AdbResult.Error("执行返回桌面失败: ${e.message ?: ""}", e)
+            AdbResult.Error(StringResources.get("common.adb.execute.home.failed", e.message ?: ""), e)
         }
     }
 
@@ -395,25 +450,34 @@ class DadbManager : AdbManager {
             val exitCode = process.waitFor()
 
             if (exitCode == 0) {
-                AdbResult.Success(output.ifEmpty { "dm-verity 已启用，需重启设备生效" })
+                AdbResult.Success(output.ifEmpty { StringResources.get("common.adb.verity.enabled") })
             } else {
-                AdbResult.Error("启用 dm-verity 失败: ${error.ifEmpty { output }}")
+                AdbResult.Error(StringResources.get("common.adb.verity.failed", error.ifEmpty { output }))
             }
         } catch (e: Exception) {
-            AdbResult.Error("执行启用 dm-verity 失败: ${e.message ?: ""}", e)
+            AdbResult.Error(StringResources.get("common.adb.execute.verity.failed", e.message ?: ""), e)
         }
     }
 
-    override suspend fun startApp(device: Device, packageName: String, activityName: String): AdbResult<String> =
+    override suspend fun startApp(device: Device, packageName: String, activityName: String?): AdbResult<String> =
         withContext(Dispatchers.IO) {
             try {
                 val adbPath = getAdbPath()
                     ?: return@withContext AdbResult.Error(StringResources.get("common.adb.not.detected"))
 
-                val component = "$packageName/$activityName"
-                val processBuilder = ProcessBuilder(
-                    adbPath, "-s", device.serialNumber, "shell", "am", "start", "-n", component
-                )
+                // 如果提供了 Activity，用 am start -n；否则用 monkey 启动默认 Activity
+                val processBuilder = if (!activityName.isNullOrBlank()) {
+                    val component = "$packageName/$activityName"
+                    ProcessBuilder(
+                        adbPath, "-s", device.serialNumber, "shell", "am", "start", "-n", component
+                    )
+                } else {
+                    ProcessBuilder(
+                        adbPath, "-s", device.serialNumber, "shell", "monkey", "-p", packageName,
+                        "-c", "android.intent.category.LAUNCHER", "1"
+                    )
+                }
+
                 val process = processBuilder.start()
                 val output = process.inputStream.bufferedReader().use { it.readText() }
                 val error = process.errorStream.bufferedReader().use { it.readText() }
@@ -444,7 +508,9 @@ class DadbManager : AdbManager {
                 val exitCode = process.waitFor()
 
                 if (exitCode == 0) {
-                    AdbResult.Success(output)
+                    // 使用工具类提取关键信息
+                    val keyInfo = com.zhang.adbhub.common.utils.AppInfoParser.extractKeyAppInfo(output)
+                    AdbResult.Success(keyInfo)
                 } else {
                     AdbResult.Error(StringResources.get("common.adb.app.info.failed", error.ifEmpty { output }))
                 }
@@ -588,7 +654,7 @@ class DadbManager : AdbManager {
                 val exitCode = process.waitFor()
 
                 if (exitCode == 0) {
-                    AdbResult.Success("文件下载成功: ${localPath.absolutePath}\n$output")
+                    AdbResult.Success(StringResources.get("common.adb.pull.file.success", localPath.absolutePath, output))
                 } else {
                     AdbResult.Error(StringResources.get("common.adb.pull.failed", error.ifEmpty { output }))
                 }
@@ -616,7 +682,7 @@ class DadbManager : AdbManager {
                 val exitCode = process.waitFor()
 
                 if (exitCode == 0) {
-                    AdbResult.Success("文件上传成功: $remotePath\n$output")
+                    AdbResult.Success(StringResources.get("common.adb.push.file.success.with.output", remotePath, output))
                 } else {
                     AdbResult.Error(StringResources.get("common.adb.push.file.failed", error.ifEmpty { output }))
                 }

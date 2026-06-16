@@ -9,6 +9,7 @@ import com.zhang.adbhub.common.model.Device
 import com.zhang.adbhub.common.model.DeviceState
 import com.zhang.adbhub.common.model.FileInfo
 import com.zhang.adbhub.desktop.utils.StringResources
+import com.zhang.adbhub.desktop.utils.CircularLogBuffer
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
@@ -28,13 +29,19 @@ data class DeviceDetectionItem(
     val status: DeviceDetectionStatus
 )
 
-class MainViewModel {
+class MainViewModel(
+    private val adbManager: AdbManager = DadbManager(),
+    startMonitoring: Boolean = true
+) {
     private companion object {
         const val DEVICE_MONITOR_INTERVAL_MS = 2_000L
+        const val MAX_LOG_LINES = 50_000
+        const val MAX_OPERATION_LOGS = 1_000
+        const val LOG_UI_BATCH_SIZE = 64
+        const val LOG_UI_FLUSH_INTERVAL_MS = 80L
     }
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private val adbManager: AdbManager = DadbManager()
     private val deviceRefreshMutex = Mutex()
 
     private val _devices = MutableStateFlow<List<Device>>(emptyList())
@@ -46,14 +53,22 @@ class MainViewModel {
     private val _selectedTab = MutableStateFlow(OperationTab.DEVICE_COMMANDS)
     val selectedTab: StateFlow<OperationTab> = _selectedTab.asStateFlow()
 
+    // Use efficient circular buffer for log lines
+    private val logBuffer = CircularLogBuffer(MAX_LOG_LINES)
     private val _rawLogLines = MutableStateFlow<List<String>>(emptyList())
     private val _logFilter = MutableStateFlow("")
     val logFilter: StateFlow<String> = _logFilter.asStateFlow()
+
+    // Optimization: Deduplicate filter logic to prevent unnecessary recomposition
+    // Use stateIn with Eagerly to maintain a stable reference that only updates when actual content changes
     val logLines: StateFlow<List<String>> = combine(_rawLogLines, _logFilter) { lines, filter ->
-        if (filter.isBlank()) {
-            lines
-        } else {
-            lines.filter { line -> line.contains(filter, ignoreCase = true) }
+        when {
+            filter.isBlank() -> lines
+            else -> {
+                // Optimization: Use built-in ignoreCase parameter which is optimized in Kotlin stdlib
+                // This avoids creating temporary lowercase strings
+                lines.filter { line -> line.contains(filter, ignoreCase = true) }
+            }
         }
     }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
@@ -72,10 +87,11 @@ class MainViewModel {
     private val _isExecuting = MutableStateFlow(false)
     val isExecuting: StateFlow<Boolean> = _isExecuting.asStateFlow()
 
+    private val operationLogBuffer = ArrayDeque<OperationLog>(MAX_OPERATION_LOGS)
     private val _operationLogs = MutableStateFlow<List<OperationLog>>(emptyList())
     val operationLogs: StateFlow<List<OperationLog>> = _operationLogs.asStateFlow()
 
-    private val _currentPath = MutableStateFlow("/sdcard/")
+    private val _currentPath = MutableStateFlow("")
     val currentPath: StateFlow<String> = _currentPath.asStateFlow()
 
     private val _fileList = MutableStateFlow<List<FileInfo>>(emptyList())
@@ -83,9 +99,13 @@ class MainViewModel {
 
     private var logcatJob: Job? = null
     private var deviceMonitorJob: Job? = null
+    private var logcatStreamGeneration = 0L
+    private var logcatClearGeneration = 0L
 
     init {
-        startDeviceMonitor()
+        if (startMonitoring) {
+            startDeviceMonitor()
+        }
     }
 
     data class OperationLog(
@@ -97,9 +117,16 @@ class MainViewModel {
     )
 
     private fun addOperationLog(operation: String, command: String? = null, output: String? = null, success: Boolean) {
-        val timestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
+        val timestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))
         val log = OperationLog(timestamp, operation, command, output, success)
-        _operationLogs.value = (_operationLogs.value + log).takeLast(1000)
+
+        operationLogBuffer.addLast(log)
+        if (operationLogBuffer.size > MAX_OPERATION_LOGS) {
+            operationLogBuffer.removeFirst()
+        }
+        // Optimization: Create new immutable list instance to ensure Compose detects the change
+        // This prevents unnecessary recomposition while maintaining reactivity
+        _operationLogs.value = operationLogBuffer.toList()
     }
 
     fun refreshDevices() {
@@ -121,9 +148,14 @@ class MainViewModel {
 
     private suspend fun refreshDevicesOnce(silent: Boolean) {
         deviceRefreshMutex.withLock {
+            // Load config once per refresh
             val config = withContext(Dispatchers.IO) { AdbConfig.load() }
             val configuredAdbPath = config.customAdbPath?.trim().orEmpty()
-            val adbPath = withContext(Dispatchers.IO) { AdbPathDetector.getValidAdbPath(config.customAdbPath) }
+
+            // Validate ADB path once per refresh
+            val adbPath = withContext(Dispatchers.IO) {
+                AdbPathDetector.getValidAdbPath(config.customAdbPath)
+            }
 
             if (adbPath == null) {
                 _adbStatus.value = StringResources.get("status.adb.not.found")
@@ -261,10 +293,36 @@ class MainViewModel {
             return diagnostics
         }
 
-        val onlineDevices = latestDevices.filter { it.state == DeviceState.ONLINE }
-        val unauthorizedDevices = latestDevices.filter { it.state == DeviceState.UNAUTHORIZED }
-        val offlineDevices = latestDevices.filter { it.state == DeviceState.OFFLINE }
-        val unknownDevices = latestDevices.filter { it.state == DeviceState.UNKNOWN }
+        // Optimize: single pass to categorize devices
+        var onlineCount = 0
+        var unauthorizedCount = 0
+        var offlineCount = 0
+        var unknownCount = 0
+        val onlineDevices = mutableListOf<Device>()
+        val unauthorizedDevices = mutableListOf<Device>()
+        val offlineDevices = mutableListOf<Device>()
+        val unknownDevices = mutableListOf<Device>()
+
+        for (device in latestDevices) {
+            when (device.state) {
+                DeviceState.ONLINE -> {
+                    onlineCount++
+                    onlineDevices.add(device)
+                }
+                DeviceState.UNAUTHORIZED -> {
+                    unauthorizedCount++
+                    unauthorizedDevices.add(device)
+                }
+                DeviceState.OFFLINE -> {
+                    offlineCount++
+                    offlineDevices.add(device)
+                }
+                DeviceState.UNKNOWN -> {
+                    unknownCount++
+                    unknownDevices.add(device)
+                }
+            }
+        }
 
         diagnostics += DeviceDetectionItem(
             StringResources.get("device.diagnostic.device.connection"),
@@ -273,29 +331,29 @@ class MainViewModel {
                 latestDevices.size,
                 summarizeSerials(latestDevices)
             ),
-            if (onlineDevices.isNotEmpty()) DeviceDetectionStatus.OK else DeviceDetectionStatus.WARNING
+            if (onlineCount > 0) DeviceDetectionStatus.OK else DeviceDetectionStatus.WARNING
         )
 
         diagnostics += when {
-            onlineDevices.isNotEmpty() -> DeviceDetectionItem(
+            onlineCount > 0 -> DeviceDetectionItem(
                 StringResources.get("device.diagnostic.device.online"),
-                StringResources.get("device.diagnostic.device.online.ok", onlineDevices.size),
+                StringResources.get("device.diagnostic.device.online.ok", onlineCount),
                 DeviceDetectionStatus.OK
             )
-            unauthorizedDevices.isNotEmpty() -> DeviceDetectionItem(
+            unauthorizedCount > 0 -> DeviceDetectionItem(
                 StringResources.get("device.diagnostic.device.usb"),
                 StringResources.get(
                     "device.diagnostic.device.unauthorized",
-                    unauthorizedDevices.size,
+                    unauthorizedCount,
                     summarizeSerials(unauthorizedDevices)
                 ),
                 DeviceDetectionStatus.ERROR
             )
-            offlineDevices.isNotEmpty() -> DeviceDetectionItem(
+            offlineCount > 0 -> DeviceDetectionItem(
                 StringResources.get("device.diagnostic.device.online"),
                 StringResources.get(
                     "device.diagnostic.device.offline",
-                    offlineDevices.size,
+                    offlineCount,
                     summarizeSerials(offlineDevices)
                 ),
                 DeviceDetectionStatus.ERROR
@@ -304,7 +362,7 @@ class MainViewModel {
                 StringResources.get("device.diagnostic.device.online"),
                 StringResources.get(
                     "device.diagnostic.device.unknown",
-                    unknownDevices.size,
+                    unknownCount,
                     summarizeSerials(unknownDevices)
                 ),
                 DeviceDetectionStatus.WARNING
@@ -330,7 +388,12 @@ class MainViewModel {
             onlineDevices.firstOrNull { it.serialNumber == selected.serialNumber }
         }
 
-        _devices.value = latestDevices
+        // Optimization: Only update devices StateFlow if the list actually changed
+        // This prevents unnecessary recomposition of all subscribers
+        val previousDevices = _devices.value
+        if (!devicesEqual(previousDevices, latestDevices)) {
+            _devices.value = latestDevices
+        }
 
         when {
             previousSelectedDevice != null && updatedSelectedDevice == null -> {
@@ -338,13 +401,20 @@ class MainViewModel {
                 _statusMessage.value = StringResources.get("status.device.disconnected", previousSelectedDevice.serialNumber)
             }
             updatedSelectedDevice != null -> {
-                _selectedDevice.value = updatedSelectedDevice
+                // Optimization: Only update selectedDevice if it actually changed
+                if (!deviceEqual(previousSelectedDevice, updatedSelectedDevice)) {
+                    _selectedDevice.value = updatedSelectedDevice
+                }
                 if (!silent) {
                     _statusMessage.value = null
                 }
             }
             onlineDevices.isNotEmpty() -> {
-                _selectedDevice.value = onlineDevices.first()
+                val newDevice = onlineDevices.first()
+                // Optimization: Only update selectedDevice if it actually changed
+                if (!deviceEqual(previousSelectedDevice, newDevice)) {
+                    _selectedDevice.value = newDevice
+                }
                 if (!silent) {
                     _statusMessage.value = null
                 }
@@ -355,11 +425,38 @@ class MainViewModel {
         }
     }
 
+    /**
+     * Compare two devices by their essential properties to detect meaningful changes.
+     * This prevents StateFlow emission when only object references change but data is identical.
+     */
+    private fun deviceEqual(a: Device?, b: Device?): Boolean {
+        if (a === b) return true
+        if (a == null || b == null) return false
+        return a.serialNumber == b.serialNumber &&
+            a.state == b.state &&
+            a.model == b.model &&
+            a.transportId == b.transportId
+    }
+
+    /**
+     * Compare two device lists by their essential properties.
+     * This prevents StateFlow emission during periodic device monitoring when nothing changed.
+     */
+    private fun devicesEqual(a: List<Device>, b: List<Device>): Boolean {
+        if (a === b) return true
+        if (a.size != b.size) return false
+        for (i in a.indices) {
+            if (!deviceEqual(a[i], b[i])) return false
+        }
+        return true
+    }
+
     private fun clearSelectedDevice(device: Device?) {
         stopLogcatFor(device)
         _selectedDevice.value = null
+        logBuffer.clear()
         _rawLogLines.value = emptyList()
-        _currentPath.value = "/sdcard/"
+        _currentPath.value = ""
         _fileList.value = emptyList()
     }
 
@@ -376,8 +473,9 @@ class MainViewModel {
 
         stopLogcatFor(previousDevice)
         _selectedDevice.value = device
+        logBuffer.clear()
         _rawLogLines.value = emptyList()
-        _currentPath.value = "/sdcard/"
+        _currentPath.value = ""
         _fileList.value = emptyList()
     }
 
@@ -421,6 +519,8 @@ class MainViewModel {
     }
 
     fun clearLogcat() {
+        logcatClearGeneration++
+        logBuffer.clear()
         _rawLogLines.value = emptyList()
     }
 
@@ -431,19 +531,95 @@ class MainViewModel {
 
         _logFilter.value = filter
         _isLogcatRunning.value = true
+        logBuffer.clear()
         _rawLogLines.value = emptyList()
+        val streamGeneration = ++logcatStreamGeneration
 
         val newJob = scope.launch(start = CoroutineStart.LAZY) {
+            val pendingLines = ArrayList<String>(LOG_UI_BATCH_SIZE)
+            var pendingLogUpdates = 0
+            var lastPublishedAtMs = 0L
+            var scheduledFlush: Job? = null
+            var observedClearGeneration = logcatClearGeneration
+
+            fun isCurrentStream(): Boolean {
+                return logcatJob === coroutineContext[Job] &&
+                    logcatStreamGeneration == streamGeneration
+            }
+
+            fun syncClearGeneration(): Boolean {
+                if (observedClearGeneration == logcatClearGeneration) {
+                    return false
+                }
+                observedClearGeneration = logcatClearGeneration
+                pendingLines.clear()
+                pendingLogUpdates = 0
+                scheduledFlush?.cancel()
+                scheduledFlush = null
+                return true
+            }
+
+            fun flushPendingLinesToBuffer() {
+                if (!isCurrentStream() || syncClearGeneration()) {
+                    pendingLines.clear()
+                    return
+                }
+                if (pendingLines.isEmpty()) return
+                logBuffer.addAll(pendingLines)
+                pendingLogUpdates += pendingLines.size
+                pendingLines.clear()
+            }
+
+            fun publishLogs(cancelScheduled: Boolean = true) {
+                if (!isCurrentStream() || syncClearGeneration()) {
+                    pendingLines.clear()
+                    pendingLogUpdates = 0
+                    return
+                }
+                flushPendingLinesToBuffer()
+                if (pendingLogUpdates == 0) return
+                pendingLogUpdates = 0
+                if (cancelScheduled) {
+                    scheduledFlush?.cancel()
+                }
+                scheduledFlush = null
+                _rawLogLines.value = logBuffer.toList()
+                lastPublishedAtMs = System.currentTimeMillis()
+            }
+
+            fun scheduleFlush() {
+                if (scheduledFlush?.isActive == true) return
+                scheduledFlush = launch {
+                    delay(LOG_UI_FLUSH_INTERVAL_MS)
+                    scheduledFlush = null
+                    publishLogs(cancelScheduled = false)
+                }
+            }
+
             try {
                 adbManager.getLogcatFlow(device)
-                    .chunked(10)
-                    .collect { lines ->
-                        _rawLogLines.value = (_rawLogLines.value + lines).takeLast(20000)
+                    .collect { line ->
+                        syncClearGeneration()
+                        pendingLines.add(line)
+                        if (pendingLines.size >= LOG_UI_BATCH_SIZE) {
+                            flushPendingLinesToBuffer()
+                        }
+                        val canPublishNow = pendingLogUpdates >= LOG_UI_BATCH_SIZE &&
+                            System.currentTimeMillis() - lastPublishedAtMs >= LOG_UI_FLUSH_INTERVAL_MS
+                        if (canPublishNow) {
+                            publishLogs()
+                        } else {
+                            scheduleFlush()
+                        }
                     }
             } finally {
-                if (logcatJob === coroutineContext[Job]) {
+                scheduledFlush?.cancel()
+                if (isCurrentStream()) {
+                    publishLogs(cancelScheduled = false)
                     _isLogcatRunning.value = false
                     logcatJob = null
+                } else {
+                    pendingLines.clear()
                 }
             }
         }
@@ -458,6 +634,7 @@ class MainViewModel {
     private fun stopLogcatFor(device: Device?) {
         val activeJob = logcatJob
         logcatJob = null
+        logcatStreamGeneration++
         activeJob?.cancel()
         device?.let(adbManager::stopLogcat)
         _isLogcatRunning.value = false
@@ -468,7 +645,14 @@ class MainViewModel {
         scope.launch {
             _isExecuting.value = true
             val config = com.zhang.adbhub.common.config.AdbConfig.load()
-            val deviceLogPath = config.deviceLogPath ?: "/sdcard/"
+            val deviceLogPath = config.deviceLogPath?.trim()?.takeIf { it.isNotEmpty() }
+            if (deviceLogPath == null) {
+                val message = StringResources.get("operation.log.device.path.required")
+                addOperationLog(StringResources.get("operation.log.export.device.log"), null, message, false)
+                onResult(message)
+                _isExecuting.value = false
+                return@launch
+            }
             val command = "adb -s ${device.serialNumber} pull ${deviceLogPath} ${outputFolder.absolutePath}"
 
             try {
@@ -493,7 +677,14 @@ class MainViewModel {
         scope.launch {
             _isExecuting.value = true
             val config = com.zhang.adbhub.common.config.AdbConfig.load()
-            val deviceLogPath = config.deviceLogPath ?: "/sdcard/"
+            val deviceLogPath = config.deviceLogPath?.trim()?.takeIf { it.isNotEmpty() }
+            if (deviceLogPath == null) {
+                val message = StringResources.get("operation.log.device.path.required")
+                addOperationLog(StringResources.get("operation.log.clear.device.log"), null, message, false)
+                onResult(message)
+                _isExecuting.value = false
+                return@launch
+            }
             val clearPath = if (deviceLogPath.endsWith("/")) "${deviceLogPath}*" else "$deviceLogPath/*"
             val command = "adb -s ${device.serialNumber} shell rm -rf ${clearPath}"
 
@@ -533,6 +724,30 @@ class MainViewModel {
                     is AdbResult.Error -> {
                         addOperationLog(operation, command, result.message, false)
                         onResult(StringResources.get("operation.log.failed", result.message))
+                    }
+                }
+            } finally {
+                _isExecuting.value = false
+            }
+        }
+    }
+
+    fun captureScreenshot(operation: String, outputFile: File, onResult: (AdbResult<File>) -> Unit) {
+        val device = _selectedDevice.value ?: return
+        scope.launch {
+            _isExecuting.value = true
+            val command = "adb -s ${device.serialNumber} exec-out screencap -p > ${outputFile.absolutePath}"
+
+            try {
+                when (val result = adbManager.captureScreenshot(device, outputFile)) {
+                    is AdbResult.Success -> {
+                        val message = StringResources.get("operation.command.screenshot.preview.ready", outputFile.absolutePath)
+                        addOperationLog(operation, command, message, true)
+                        onResult(result)
+                    }
+                    is AdbResult.Error -> {
+                        addOperationLog(operation, command, result.message, false)
+                        onResult(result)
                     }
                 }
             } finally {
@@ -702,11 +917,15 @@ class MainViewModel {
         }
     }
 
-    fun startApp(packageName: String, activityName: String, onResult: (String) -> Unit) {
+    fun startApp(packageName: String, activityName: String?, onResult: (String) -> Unit) {
         val device = _selectedDevice.value ?: return
         scope.launch {
             _isExecuting.value = true
-            val command = "adb -s ${device.serialNumber} shell am start -n $packageName/$activityName"
+            val command = if (!activityName.isNullOrBlank()) {
+                "adb -s ${device.serialNumber} shell am start -n $packageName/$activityName"
+            } else {
+                "adb -s ${device.serialNumber} shell monkey -p $packageName -c android.intent.category.LAUNCHER 1"
+            }
 
             try {
                 when (val result = adbManager.startApp(device, packageName, activityName)) {
@@ -796,15 +1015,19 @@ class MainViewModel {
 
     // File management methods
     fun navigateToPath(path: String) {
+        val normalizedPath = path.trim()
+        if (normalizedPath.isEmpty()) {
+            return
+        }
         val device = _selectedDevice.value ?: return
         scope.launch {
             _isExecuting.value = true
-            val command = "adb -s ${device.serialNumber} shell ls -la $path"
+            val command = "adb -s ${device.serialNumber} shell ls -la $normalizedPath"
 
             try {
-                when (val result = adbManager.listFiles(device, path)) {
+                when (val result = adbManager.listFiles(device, normalizedPath)) {
                     is AdbResult.Success -> {
-                        _currentPath.value = path
+                        _currentPath.value = normalizedPath
                         _fileList.value = result.data
                         addOperationLog(StringResources.get("operation.log.browse.directory"), command, StringResources.get("operation.log.browse.success", result.data.size), true)
                     }
@@ -819,8 +1042,16 @@ class MainViewModel {
         }
     }
 
+    fun clearPath() {
+        _currentPath.value = ""
+        _fileList.value = emptyList()
+    }
+
     private suspend fun refreshCurrentPath(device: Device) {
         val path = _currentPath.value
+        if (path.isBlank()) {
+            return
+        }
         val command = "adb -s ${device.serialNumber} shell ls -la $path"
 
         when (val result = adbManager.listFiles(device, path)) {

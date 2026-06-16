@@ -34,7 +34,7 @@
 ### 📦 APK 推送
 - 📂 可视化文件选择器
 - 🎯 自定义目标路径
-- ⚡ 常用路径快捷选择
+- ⚡ 保存上次使用的目标路径
 - 📊 实时推送进度显示
 
 ### 🎮 应用管理
@@ -93,11 +93,10 @@ cd ADBHub
 
 ### ADB 配置
 
-**自动检测路径**（无需手动配置）：
-- Windows: `%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe`
-- macOS: `~/Library/Android/sdk/platform-tools/adb`
-- Linux: `~/Android/Sdk/platform-tools/adb`
-- 系统 PATH 环境变量
+**ADB 路径配置**：
+- 在应用设置中选择本机 ADB 可执行文件
+- 不确定安装位置时，可在确认后让应用扫描当前可见盘符
+- 已配置的路径会保存到用户配置中供下次使用
 
 **手动安装 ADB**：
 - Windows: [下载 Platform Tools](https://developer.android.com/tools/releases/platform-tools)
@@ -126,7 +125,7 @@ cd ADBHub
 ### 2. Push APK
 1. 切换到"Push APK"标签
 2. 选择本地 APK 文件
-3. 选择目标路径（或使用快捷路径）
+3. 输入目标路径（会保存上次使用的路径）
 4. 点击"推送到设备"
 
 ### 3. 设备操作

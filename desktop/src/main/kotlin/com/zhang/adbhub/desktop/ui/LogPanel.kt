@@ -50,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,11 +65,14 @@ import com.zhang.adbhub.common.config.AdbConfig
 import com.zhang.adbhub.common.model.Device
 import com.zhang.adbhub.desktop.viewmodel.MainViewModel
 import com.zhang.adbhub.desktop.utils.StringResources
-import java.awt.FileDialog
-import java.awt.Frame
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import javax.swing.JFileChooser
+
+private const val LOG_EXPORT_FOLDER_PREFIX = "logs"
+private const val UNKNOWN_DEVICE_SERIAL = "unknown"
+private const val LOG_EXPORT_TIMESTAMP_PATTERN = "yyyyMMdd_HHmmss"
 
 @Composable
 fun LogPanel(
@@ -198,8 +202,18 @@ fun OperationLogView(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     val logs by viewModel.operationLogs.collectAsState()
     val listState = rememberLazyListState()
 
-    LaunchedEffect(logs.size) {
-        if (logs.isNotEmpty()) {
+    // Optimization: Use derivedStateOf to cache scroll position calculation
+    val isAtBottom by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val totalItems = layoutInfo.totalItemsCount
+            totalItems == 0 || layoutInfo.visibleItemsInfo.lastOrNull()?.index == totalItems - 1
+        }
+    }
+
+    // Optimization: Reduce LaunchedEffect dependencies - only trigger on logs.size and when at bottom
+    LaunchedEffect(logs.size, isAtBottom) {
+        if (logs.isNotEmpty() && isAtBottom) {
             listState.scrollToItem(logs.lastIndex)
         }
     }
@@ -230,7 +244,11 @@ fun OperationLogView(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                             .padding(end = 12.dp, start = 8.dp, top = 8.dp, bottom = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(logs) { log ->
+                        // Optimization: Add stable key based on timestamp to prevent recomposition flicker
+                        items(
+                            items = logs,
+                            key = { log -> log.timestamp }
+                        ) { log ->
                             OperationLogItem(log)
                         }
                     }
@@ -293,8 +311,7 @@ fun OperationLogItem(log: MainViewModel.OperationLog) {
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(start = 8.dp),
-                    maxLines = 2
+                    modifier = Modifier.padding(start = 8.dp)
                 )
             }
 
@@ -304,8 +321,7 @@ fun OperationLogItem(log: MainViewModel.OperationLog) {
                     text = output,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 8.dp),
-                    maxLines = 2
+                    modifier = Modifier.padding(start = 8.dp)
                 )
             }
         }
@@ -324,14 +340,28 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, isFullscree
     val listState = rememberLazyListState()
     val horizontalLogScrollState = rememberScrollState()
 
-    LaunchedEffect(filterText) {
-        if (logLines.isNotEmpty() && filterText.isNotBlank()) {
+    // Optimization: Use derivedStateOf to cache scroll behavior check, reducing recomposition
+    val shouldScrollToTop by remember {
+        derivedStateOf {
+            logLines.isNotEmpty() && filterText.isNotBlank()
+        }
+    }
+
+    val shouldScrollToBottom by remember {
+        derivedStateOf {
+            logLines.isNotEmpty() && isLogcatRunning && filterText.isBlank()
+        }
+    }
+
+    // Optimization: Separate LaunchedEffects with minimal dependencies to reduce unnecessary triggers
+    LaunchedEffect(shouldScrollToTop, filterText) {
+        if (shouldScrollToTop) {
             listState.scrollToItem(0)
         }
     }
 
-    LaunchedEffect(logLines.size, filterText, isLogcatRunning) {
-        if (logLines.isNotEmpty() && isLogcatRunning && filterText.isBlank()) {
+    LaunchedEffect(shouldScrollToBottom, logLines.size) {
+        if (shouldScrollToBottom) {
             listState.scrollToItem(logLines.lastIndex)
         }
     }
@@ -416,17 +446,14 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, isFullscree
                 ) {
                     Button(
                         onClick = {
-                            val dialog = FileDialog(Frame(), "Select export directory", FileDialog.LOAD)
-                            System.setProperty("apple.awt.fileDialogForDirectories", "true")
-                            dialog.isVisible = true
-                            System.setProperty("apple.awt.fileDialogForDirectories", "false")
+                            val chooser = JFileChooser().apply {
+                                dialogTitle = StringResources.get("log.panel.export.directory.title")
+                                fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+                                isAcceptAllFileFilterUsed = false
+                            }
 
-                            val selectedDir = dialog.directory
-                            if (selectedDir != null) {
-                                val timestamp = LocalDateTime.now()
-                                    .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-                                val deviceSerial = selectedDevice?.serialNumber ?: "unknown"
-                                val outputFolder = File(selectedDir, "logs_${deviceSerial}_$timestamp")
+                            if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                                val outputFolder = createLogExportFolder(chooser.selectedFile, selectedDevice)
 
                                 viewModel.exportLogs(outputFolder) { result ->
                                     exportStatus = result
@@ -558,9 +585,14 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, isFullscree
                                 state = listState,
                                 modifier = Modifier.width(2400.dp).fillMaxHeight()
                             ) {
-                                items(logLines) { line ->
+                                // Optimization: Use index-based key to prevent key conflicts
+                                // Log lines can be duplicated, so we use index as unique identifier
+                                items(
+                                    count = logLines.size,
+                                    key = { index -> "log_$index" }
+                                ) { index ->
                                     LogLineItem(
-                                        line = line,
+                                        line = logLines[index],
                                         isFullscreen = isFullscreen,
                                         modifier = Modifier.fillMaxWidth()
                                     )
@@ -591,7 +623,10 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, isFullscree
                 Text(
                     text = exportStatus,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (exportStatus.contains("成功") || exportStatus.contains("success", true)) {
+                    color = if (
+                        exportStatus.contains(StringResources.get("status.success.keyword")) ||
+                        exportStatus.contains("success", true)
+                    ) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.error
@@ -630,6 +665,15 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, isFullscree
             )
         }
     }
+}
+
+private fun createLogExportFolder(parentDir: File, selectedDevice: Device?): File {
+    val timestamp = LocalDateTime.now()
+        .format(DateTimeFormatter.ofPattern(LOG_EXPORT_TIMESTAMP_PATTERN))
+    val deviceSerial = selectedDevice?.serialNumber ?: UNKNOWN_DEVICE_SERIAL
+
+    // 只自动命名本地最外层导出目录，设备内原始日志文件名保持不变。
+    return File(parentDir, "${LOG_EXPORT_FOLDER_PREFIX}_${deviceSerial}_$timestamp")
 }
 
 @Composable

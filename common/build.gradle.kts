@@ -16,15 +16,8 @@ dependencies {
     // Kotlin Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
-    // Testing
-    testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 }
 
 kotlin {
     jvmToolchain(11)
-}
-
-tasks.test {
-    useJUnitPlatform()
 }

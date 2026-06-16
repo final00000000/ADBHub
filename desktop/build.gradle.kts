@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.zhang.adbhub"
-version = "1.1.0"
+version = "1.2.0"
 
 dependencies {
     // Common module
@@ -18,6 +18,7 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
+
 }
 
 kotlin {
@@ -36,7 +37,7 @@ compose.desktop {
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb
             )
             packageName = "ADBHub"
-            packageVersion = "1.1.0"
+            packageVersion = "1.2.0"
             description = "Android Debug Bridge 管理工具"
             vendor = "ADBHub Team"
 
