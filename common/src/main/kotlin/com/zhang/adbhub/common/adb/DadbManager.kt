@@ -121,7 +121,7 @@ class DadbManager : AdbManager {
             }
 
             val processBuilder = ProcessBuilder(
-                adbPath, "-s", device.serialNumber, "logcat", "-T", "100", "-v", "threadtime"
+                adbPath, "-s", device.serialNumber, "logcat", "-T", "1000", "-v", "threadtime", "*:V"
             ).redirectErrorStream(true)
             val startedProcess = processBuilder.start()
             process = startedProcess

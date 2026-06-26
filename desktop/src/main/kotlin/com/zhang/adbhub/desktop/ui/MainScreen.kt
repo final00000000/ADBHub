@@ -1,5 +1,6 @@
 package com.zhang.adbhub.desktop.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +25,7 @@ import com.zhang.adbhub.desktop.viewmodel.MainViewModel
 @Composable
 fun MainScreen() {
     val viewModel = remember { MainViewModel() }
+    val toastState = rememberToastState()
 
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showSetupGuide by remember { mutableStateOf(false) }
@@ -45,35 +47,44 @@ fun MainScreen() {
         }
     }
 
-    if (isLogFullscreen) {
-        FullscreenLogPanelHost(
-            viewModel = viewModel,
-            onToggleFullscreen = { isLogFullscreen = false },
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (isLogFullscreen) {
+            FullscreenLogPanelHost(
+                viewModel = viewModel,
+                onToggleFullscreen = { isLogFullscreen = false },
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Row(modifier = Modifier.fillMaxSize()) {
+                DeviceListPanelHost(
+                    viewModel = viewModel,
+                    onSettingsClick = { showSettingsDialog = true },
+                    modifier = Modifier.width(280.dp).fillMaxHeight()
+                )
+
+                VerticalDivider(modifier = Modifier.width(1.dp).fillMaxHeight())
+
+                OperationPanelHost(
+                    viewModel = viewModel,
+                    toastState = toastState,
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+
+                VerticalDivider(modifier = Modifier.width(1.dp).fillMaxHeight())
+
+                LogPanelHost(
+                    viewModel = viewModel,
+                    onToggleFullscreen = { isLogFullscreen = true },
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+            }
+        }
+
+        // Toast 显示在顶部
+        ToastHost(
+            toastState = toastState,
             modifier = Modifier.fillMaxSize()
         )
-    } else {
-        Row(modifier = Modifier.fillMaxSize()) {
-            DeviceListPanelHost(
-                viewModel = viewModel,
-                onSettingsClick = { showSettingsDialog = true },
-                modifier = Modifier.width(280.dp).fillMaxHeight()
-            )
-
-            VerticalDivider(modifier = Modifier.width(1.dp).fillMaxHeight())
-
-            OperationPanelHost(
-                viewModel = viewModel,
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            )
-
-            VerticalDivider(modifier = Modifier.width(1.dp).fillMaxHeight())
-
-            LogPanelHost(
-                viewModel = viewModel,
-                onToggleFullscreen = { isLogFullscreen = true },
-                modifier = Modifier.width(450.dp).fillMaxHeight()
-            )
-        }
     }
 
     if (showSettingsDialog) {
@@ -124,6 +135,7 @@ private fun DeviceListPanelHost(
 @Composable
 private fun OperationPanelHost(
     viewModel: MainViewModel,
+    toastState: ToastState,
     modifier: Modifier = Modifier
 ) {
     val selectedDevice by viewModel.selectedDevice.collectAsState()
@@ -134,6 +146,7 @@ private fun OperationPanelHost(
         selectedTab = selectedTab,
         onTabSelected = { viewModel.selectTab(it) },
         viewModel = viewModel,
+        toastState = toastState,
         modifier = modifier
     )
 }

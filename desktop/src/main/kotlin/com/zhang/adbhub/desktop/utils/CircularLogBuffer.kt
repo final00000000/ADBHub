@@ -9,8 +9,8 @@ import kotlin.concurrent.write
  * 避免频繁的大数组复制操作
  * 线程安全：使用读写锁保护并发访问
  */
-class CircularLogBuffer(private val maxSize: Int) {
-    private val buffer = ArrayDeque<String>(minOf(maxOf(maxSize, 1), 1000))
+class CircularLogBuffer<T>(private val maxSize: Int) {
+    private val buffer = ArrayDeque<T>(minOf(maxOf(maxSize, 1), 1000))
     private val lock = ReentrantReadWriteLock()
 
     init {
@@ -20,15 +20,15 @@ class CircularLogBuffer(private val maxSize: Int) {
     /**
      * 添加多行日志
      */
-    fun addAll(lines: List<String>) {
-        if (lines.isEmpty()) return
+    fun addAll(items: List<T>) {
+        if (items.isEmpty()) return
         lock.write {
-            if (lines.size >= maxSize) {
+            if (items.size >= maxSize) {
                 buffer.clear()
-                buffer.addAll(lines.takeLast(maxSize))
+                buffer.addAll(items.takeLast(maxSize))
                 return@write
             }
-            buffer.addAll(lines)
+            buffer.addAll(items)
             trimToMaxSize()
         }
     }
@@ -36,9 +36,9 @@ class CircularLogBuffer(private val maxSize: Int) {
     /**
      * 添加单行日志
      */
-    fun add(line: String) {
+    fun add(item: T) {
         lock.write {
-            buffer.addLast(line)
+            buffer.addLast(item)
             trimToMaxSize()
         }
     }
@@ -55,7 +55,7 @@ class CircularLogBuffer(private val maxSize: Int) {
     /**
      * 获取所有日志行
      */
-    fun toList(): List<String> = lock.read {
+    fun toList(): List<T> = lock.read {
         buffer.toList()
     }
 

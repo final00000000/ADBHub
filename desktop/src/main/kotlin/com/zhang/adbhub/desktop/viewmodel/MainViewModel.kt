@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.util.Locale
 
 enum class DeviceDetectionStatus {
     OK,
@@ -33,6 +34,45 @@ class MainViewModel(
     private val adbManager: AdbManager = DadbManager(),
     startMonitoring: Boolean = true
 ) {
+    data class LogEntry(
+        val raw: String,
+        val timestamp: String? = null,
+        val level: LogLevel = LogLevel.UNKNOWN,
+        val tag: String? = null,
+        val message: String = raw,
+        val isHighlighted: Boolean = false
+    )
+
+    enum class LogLevel(val displayName: String) {
+        VERBOSE("V"),
+        DEBUG("D"),
+        INFO("I"),
+        WARN("W"),
+        ERROR("E"),
+        ASSERT("A"),
+        UNKNOWN("?")
+    }
+
+    data class LogFilterState(
+        val query: String = "",
+        val excludeQuery: String = "",
+        val level: LogLevel? = null
+    )
+
+    data class LogStreamStats(
+        val total: Int = 0,
+        val visible: Int = 0,
+        val matched: Int = 0,
+        val important: Int = 0
+    )
+
+    private data class ParsedLogLine(
+        val timestamp: String? = null,
+        val level: LogLevel = LogLevel.UNKNOWN,
+        val tag: String? = null,
+        val message: String = ""
+    )
+
     private companion object {
         const val DEVICE_MONITOR_INTERVAL_MS = 2_000L
         const val MAX_LOG_LINES = 50_000
@@ -54,23 +94,41 @@ class MainViewModel(
     val selectedTab: StateFlow<OperationTab> = _selectedTab.asStateFlow()
 
     // Use efficient circular buffer for log lines
-    private val logBuffer = CircularLogBuffer(MAX_LOG_LINES)
-    private val _rawLogLines = MutableStateFlow<List<String>>(emptyList())
+    private val logBuffer = CircularLogBuffer<LogEntry>(MAX_LOG_LINES)
+    private val _rawLogEntries = MutableStateFlow<List<LogEntry>>(emptyList())
     private val _logFilter = MutableStateFlow("")
     val logFilter: StateFlow<String> = _logFilter.asStateFlow()
+    private val _logExcludeFilter = MutableStateFlow("")
+    val logExcludeFilter: StateFlow<String> = _logExcludeFilter.asStateFlow()
+    private val _logLevelFilter = MutableStateFlow<LogLevel?>(null)
+    val logLevelFilter: StateFlow<LogLevel?> = _logLevelFilter.asStateFlow()
+
+    val logFilterState: StateFlow<LogFilterState> = combine(
+        _logFilter,
+        _logExcludeFilter,
+        _logLevelFilter
+    ) { query, excludeQuery, level ->
+        LogFilterState(query = query, excludeQuery = excludeQuery, level = level)
+    }.stateIn(scope, SharingStarted.Eagerly, LogFilterState())
 
     // Optimization: Deduplicate filter logic to prevent unnecessary recomposition
     // Use stateIn with Eagerly to maintain a stable reference that only updates when actual content changes
-    val logLines: StateFlow<List<String>> = combine(_rawLogLines, _logFilter) { lines, filter ->
-        when {
-            filter.isBlank() -> lines
-            else -> {
-                // Optimization: Use built-in ignoreCase parameter which is optimized in Kotlin stdlib
-                // This avoids creating temporary lowercase strings
-                lines.filter { line -> line.contains(filter, ignoreCase = true) }
-            }
+    val logLines: StateFlow<List<LogEntry>> = combine(_rawLogEntries, logFilterState) { entries, filterState ->
+        entries.filter { entry ->
+            matchesLogFilter(entry, filterState)
+        }.map { entry ->
+            entry.copy(isHighlighted = shouldHighlight(entry, filterState))
         }
     }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+    val logStats: StateFlow<LogStreamStats> = combine(_rawLogEntries, logLines) { rawEntries, visibleEntries ->
+        LogStreamStats(
+            total = rawEntries.size,
+            visible = visibleEntries.size,
+            matched = visibleEntries.count { it.isHighlighted },
+            important = visibleEntries.count { isImportantLog(it) }
+        )
+    }.stateIn(scope, SharingStarted.Eagerly, LogStreamStats())
 
     private val _isLogcatRunning = MutableStateFlow(false)
     val isLogcatRunning: StateFlow<Boolean> = _isLogcatRunning.asStateFlow()
@@ -86,6 +144,8 @@ class MainViewModel(
 
     private val _isExecuting = MutableStateFlow(false)
     val isExecuting: StateFlow<Boolean> = _isExecuting.asStateFlow()
+
+    private val _isExecutingRootCommand = MutableStateFlow(false)
 
     private val operationLogBuffer = ArrayDeque<OperationLog>(MAX_OPERATION_LOGS)
     private val _operationLogs = MutableStateFlow<List<OperationLog>>(emptyList())
@@ -115,6 +175,80 @@ class MainViewModel(
         val output: String?,
         val success: Boolean
     )
+
+    private fun parseLogEntry(rawLine: String): LogEntry {
+        val parsed = parseThreadTimeLog(rawLine)
+        return LogEntry(
+            raw = rawLine,
+            timestamp = parsed.timestamp,
+            level = parsed.level,
+            tag = parsed.tag,
+            message = parsed.message.ifBlank { rawLine }
+        )
+    }
+
+    private fun parseThreadTimeLog(rawLine: String): ParsedLogLine {
+        val parts = rawLine.trimStart().split(Regex("\\s+"), limit = 7)
+        if (parts.size < 7) {
+            return ParsedLogLine(message = rawLine)
+        }
+
+        val level = when (parts[4].uppercase(Locale.ROOT)) {
+            "V" -> LogLevel.VERBOSE
+            "D" -> LogLevel.DEBUG
+            "I" -> LogLevel.INFO
+            "W" -> LogLevel.WARN
+            "E" -> LogLevel.ERROR
+            "F", "A" -> LogLevel.ASSERT
+            else -> LogLevel.UNKNOWN
+        }
+
+        return ParsedLogLine(
+            timestamp = "${parts[0]} ${parts[1]}",
+            level = level,
+            tag = parts[5].removeSuffix(":"),
+            message = parts[6]
+        )
+    }
+
+    private fun matchesLogFilter(entry: LogEntry, filterState: LogFilterState): Boolean {
+        val level = filterState.level
+        if (level != null && entry.level != level) {
+            return false
+        }
+
+        val queryTokens = splitLogQuery(filterState.query)
+        if (queryTokens.isNotEmpty() && queryTokens.none { token ->
+                entry.raw.contains(token, ignoreCase = true)
+            }
+        ) {
+            return false
+        }
+
+        val excludeTokens = splitLogQuery(filterState.excludeQuery)
+        if (excludeTokens.any { token -> entry.raw.contains(token, ignoreCase = true) }) {
+            return false
+        }
+
+        return true
+    }
+
+    private fun shouldHighlight(entry: LogEntry, filterState: LogFilterState): Boolean {
+        val queryTokens = splitLogQuery(filterState.query)
+        return isImportantLog(entry) || queryTokens.any { token ->
+            entry.raw.contains(token, ignoreCase = true)
+        }
+    }
+
+    private fun isImportantLog(entry: LogEntry): Boolean {
+        return entry.level == LogLevel.ERROR || entry.level == LogLevel.WARN || entry.level == LogLevel.ASSERT
+    }
+
+    private fun splitLogQuery(query: String): List<String> {
+        return query.split(',', '|', ';')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+    }
 
     private fun addOperationLog(operation: String, command: String? = null, output: String? = null, success: Boolean) {
         val timestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))
@@ -395,6 +529,12 @@ class MainViewModel(
             _devices.value = latestDevices
         }
 
+        // Skip updating selectedDevice during root/remount command execution
+        // The device will temporarily disconnect during ADB daemon restart
+        if (_isExecutingRootCommand.value) {
+            return
+        }
+
         when {
             previousSelectedDevice != null && updatedSelectedDevice == null -> {
                 clearSelectedDevice(previousSelectedDevice)
@@ -455,7 +595,7 @@ class MainViewModel(
         stopLogcatFor(device)
         _selectedDevice.value = null
         logBuffer.clear()
-        _rawLogLines.value = emptyList()
+        _rawLogEntries.value = emptyList()
         _currentPath.value = ""
         _fileList.value = emptyList()
     }
@@ -474,7 +614,7 @@ class MainViewModel(
         stopLogcatFor(previousDevice)
         _selectedDevice.value = device
         logBuffer.clear()
-        _rawLogLines.value = emptyList()
+        _rawLogEntries.value = emptyList()
         _currentPath.value = ""
         _fileList.value = emptyList()
     }
@@ -518,10 +658,24 @@ class MainViewModel(
         _logFilter.value = filter
     }
 
+    fun setLogExcludeFilter(filter: String) {
+        _logExcludeFilter.value = filter
+    }
+
+    fun setLogLevelFilter(level: LogLevel?) {
+        _logLevelFilter.value = level
+    }
+
+    fun resetLogFilters() {
+        _logFilter.value = ""
+        _logExcludeFilter.value = ""
+        _logLevelFilter.value = null
+    }
+
     fun clearLogcat() {
         logcatClearGeneration++
         logBuffer.clear()
-        _rawLogLines.value = emptyList()
+        _rawLogEntries.value = emptyList()
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -532,11 +686,11 @@ class MainViewModel(
         _logFilter.value = filter
         _isLogcatRunning.value = true
         logBuffer.clear()
-        _rawLogLines.value = emptyList()
+        _rawLogEntries.value = emptyList()
         val streamGeneration = ++logcatStreamGeneration
 
         val newJob = scope.launch(start = CoroutineStart.LAZY) {
-            val pendingLines = ArrayList<String>(LOG_UI_BATCH_SIZE)
+            val pendingLines = ArrayList<LogEntry>(LOG_UI_BATCH_SIZE)
             var pendingLogUpdates = 0
             var lastPublishedAtMs = 0L
             var scheduledFlush: Job? = null
@@ -583,7 +737,7 @@ class MainViewModel(
                     scheduledFlush?.cancel()
                 }
                 scheduledFlush = null
-                _rawLogLines.value = logBuffer.toList()
+                _rawLogEntries.value = logBuffer.toList()
                 lastPublishedAtMs = System.currentTimeMillis()
             }
 
@@ -600,7 +754,7 @@ class MainViewModel(
                 adbManager.getLogcatFlow(device)
                     .collect { line ->
                         syncClearGeneration()
-                        pendingLines.add(line)
+                        pendingLines.add(parseLogEntry(line))
                         if (pendingLines.size >= LOG_UI_BATCH_SIZE) {
                             flushPendingLinesToBuffer()
                         }
@@ -760,6 +914,7 @@ class MainViewModel(
         val device = _selectedDevice.value ?: return
         scope.launch {
             _isExecuting.value = true
+            _isExecutingRootCommand.value = true
             val command = "adb -s ${device.serialNumber} root"
 
             try {
@@ -775,6 +930,7 @@ class MainViewModel(
                 }
             } finally {
                 _isExecuting.value = false
+                _isExecutingRootCommand.value = false
             }
         }
     }
@@ -783,6 +939,7 @@ class MainViewModel(
         val device = _selectedDevice.value ?: return
         scope.launch {
             _isExecuting.value = true
+            _isExecutingRootCommand.value = true
             val command = "adb -s ${device.serialNumber} remount"
 
             try {
@@ -798,6 +955,7 @@ class MainViewModel(
                 }
             } finally {
                 _isExecuting.value = false
+                _isExecutingRootCommand.value = false
             }
         }
     }

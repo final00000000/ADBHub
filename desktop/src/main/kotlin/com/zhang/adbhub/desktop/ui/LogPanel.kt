@@ -57,8 +57,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zhang.adbhub.common.config.AdbConfig
@@ -332,6 +337,9 @@ fun OperationLogItem(log: MainViewModel.OperationLog) {
 fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, isFullscreen: Boolean, onToggleFullscreen: () -> Unit, modifier: Modifier = Modifier) {
     val logLines by viewModel.logLines.collectAsState()
     val filterText by viewModel.logFilter.collectAsState()
+    val excludeFilterText by viewModel.logExcludeFilter.collectAsState()
+    val levelFilter by viewModel.logLevelFilter.collectAsState()
+    val logStats by viewModel.logStats.collectAsState()
     val isLogcatRunning by viewModel.isLogcatRunning.collectAsState()
     val isExecuting by viewModel.isExecuting.collectAsState()
     var exportStatus by remember { mutableStateOf("") }
@@ -343,18 +351,18 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, isFullscree
     // Optimization: Use derivedStateOf to cache scroll behavior check, reducing recomposition
     val shouldScrollToTop by remember {
         derivedStateOf {
-            logLines.isNotEmpty() && filterText.isNotBlank()
+            logLines.isNotEmpty() && (filterText.isNotBlank() || excludeFilterText.isNotBlank() || levelFilter != null)
         }
     }
 
     val shouldScrollToBottom by remember {
         derivedStateOf {
-            logLines.isNotEmpty() && isLogcatRunning && filterText.isBlank()
+            logLines.isNotEmpty() && isLogcatRunning && filterText.isBlank() && excludeFilterText.isBlank() && levelFilter == null
         }
     }
 
     // Optimization: Separate LaunchedEffects with minimal dependencies to reduce unnecessary triggers
-    LaunchedEffect(shouldScrollToTop, filterText) {
+    LaunchedEffect(shouldScrollToTop, filterText, excludeFilterText, levelFilter) {
         if (shouldScrollToTop) {
             listState.scrollToItem(0)
         }
@@ -367,187 +375,59 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, isFullscree
     }
 
     Column(modifier = modifier) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = StringResources.get("log.panel.logcat.stream"),
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Button(
-                        onClick = onToggleFullscreen,
-                        modifier = Modifier.weight(1f).height(36.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp)
-                    ) {
-                        Icon(
-                            if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            if (isFullscreen) StringResources.get("log.panel.exit.fullscreen") else StringResources.get("log.panel.fullscreen"),
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1
-                        )
-                    }
-                    Button(
-                        onClick = {
-                            if (isLogcatRunning) {
-                                viewModel.stopLogcat()
-                            } else {
-                                viewModel.startLogcat()
-                            }
-                        },
-                        enabled = selectedDevice != null,
-                        modifier = Modifier.weight(1f).height(36.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        colors = if (isLogcatRunning) {
-                            ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                        } else {
-                            ButtonDefaults.buttonColors()
-                        }
-                    ) {
-                        Icon(
-                            if (isLogcatRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            if (isLogcatRunning) StringResources.get("log.panel.stop") else StringResources.get("log.panel.start"),
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1
-                        )
-                    }
-                    Button(
-                        onClick = { viewModel.clearLogcat() },
-                        enabled = selectedDevice != null && logLines.isNotEmpty(),
-                        modifier = Modifier.weight(1f).height(36.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp)
-                    ) {
-                        Icon(Icons.Default.ClearAll, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(StringResources.get("log.panel.clear"), style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                    }
+        LogToolbar(
+            isFullscreen = isFullscreen,
+            isLogcatRunning = isLogcatRunning,
+            selectedDevice = selectedDevice,
+            isExecuting = isExecuting,
+            hasLogs = logStats.total > 0,
+            onToggleFullscreen = onToggleFullscreen,
+            onToggleStream = {
+                if (isLogcatRunning) {
+                    viewModel.stopLogcat()
+                } else {
+                    viewModel.startLogcat()
+                }
+            },
+            onClearVisible = { viewModel.clearLogcat() },
+            onExport = {
+                val chooser = JFileChooser().apply {
+                    dialogTitle = StringResources.get("log.panel.export.directory.title")
+                    fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+                    isAcceptAllFileFilterUsed = false
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            val chooser = JFileChooser().apply {
-                                dialogTitle = StringResources.get("log.panel.export.directory.title")
-                                fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
-                                isAcceptAllFileFilterUsed = false
-                            }
+                if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                    val outputFolder = createLogExportFolder(chooser.selectedFile, selectedDevice)
 
-                            if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                                val outputFolder = createLogExportFolder(chooser.selectedFile, selectedDevice)
-
-                                viewModel.exportLogs(outputFolder) { result ->
-                                    exportStatus = result
-                                }
-                            }
-                        },
-                        enabled = selectedDevice != null && !isExecuting,
-                        modifier = Modifier.weight(1f).height(36.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp)
-                    ) {
-                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(StringResources.get("log.panel.export"), style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                    }
-                    Button(
-                        onClick = { showClearDeviceConfirm = true },
-                        enabled = selectedDevice != null && !isExecuting,
-                        modifier = Modifier.weight(1f).height(36.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(StringResources.get("log.panel.clear.device"), style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                    }
-                    Spacer(modifier = Modifier.weight(1f).height(36.dp))
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = filterText,
-            onValueChange = { viewModel.setLogFilter(it) },
-            label = { Text(StringResources.get("log.panel.filter")) },
-            placeholder = { Text(StringResources.get("log.panel.filter.placeholder")) },
-            modifier = Modifier.fillMaxWidth().height(64.dp),
-            singleLine = true,
-            enabled = selectedDevice != null,
-            trailingIcon = {
-                if (filterText.isNotEmpty()) {
-                    IconButton(onClick = { viewModel.setLogFilter("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear filter")
+                    viewModel.exportLogs(outputFolder) { result ->
+                        exportStatus = result
                     }
                 }
             },
-            textStyle = MaterialTheme.typography.bodyLarge
+            onClearDevice = { showClearDeviceConfirm = true }
         )
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Box(modifier = Modifier.fillMaxWidth().height(48.dp)) {
-            if (!isLogcatRunning) {
-                Button(
-                    onClick = { viewModel.startLogcat() },
-                    enabled = selectedDevice != null,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(StringResources.get("log.panel.start.stream"))
-                }
-            } else {
-                Button(
-                    onClick = { viewModel.stopLogcat() },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    ),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Icon(Icons.Default.Stop, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(StringResources.get("log.panel.stop.stream"))
-                }
-            }
-        }
+        LogFilterControls(
+            filterText = filterText,
+            excludeFilterText = excludeFilterText,
+            levelFilter = levelFilter,
+            enabled = selectedDevice != null,
+            onFilterChanged = { viewModel.setLogFilter(it) },
+            onExcludeChanged = { viewModel.setLogExcludeFilter(it) },
+            onLevelSelected = { viewModel.setLogLevelFilter(it) },
+            onResetFilters = { viewModel.resetLogFilters() }
+        )
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Box(
-            modifier = Modifier.fillMaxWidth().height(24.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Text(
-                text = if (isLogcatRunning) {
-                    StringResources.get("log.panel.streaming.lines", logLines.size)
-                } else {
-                    StringResources.get("log.panel.stopped.lines", logLines.size)
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        LogStatsBar(
+            isLogcatRunning = isLogcatRunning,
+            stats = logStats,
+            modifier = Modifier.fillMaxWidth().height(24.dp)
+        )
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -592,7 +472,7 @@ fun DeviceLogView(selectedDevice: Device?, viewModel: MainViewModel, isFullscree
                                     key = { index -> "log_$index" }
                                 ) { index ->
                                     LogLineItem(
-                                        line = logLines[index],
+                                        entry = logLines[index],
                                         isFullscreen = isFullscreen,
                                         modifier = Modifier.fillMaxWidth()
                                     )
@@ -690,26 +570,324 @@ private fun EmptyLogMessage(message: String) {
 }
 
 @Composable
+private fun LogToolbar(
+    isFullscreen: Boolean,
+    isLogcatRunning: Boolean,
+    selectedDevice: Device?,
+    isExecuting: Boolean,
+    hasLogs: Boolean,
+    onToggleFullscreen: () -> Unit,
+    onToggleStream: () -> Unit,
+    onClearVisible: () -> Unit,
+    onExport: () -> Unit,
+    onClearDevice: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = StringResources.get("log.panel.logcat.stream"),
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            CompactLogButton(
+                icon = if (isLogcatRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
+                label = if (isLogcatRunning) StringResources.get("log.panel.stop") else StringResources.get("log.panel.start"),
+                enabled = selectedDevice != null,
+                isDanger = isLogcatRunning,
+                onClick = onToggleStream
+            )
+            CompactLogButton(
+                icon = Icons.Default.ClearAll,
+                label = StringResources.get("log.panel.clear"),
+                enabled = selectedDevice != null && hasLogs,
+                onClick = onClearVisible
+            )
+            CompactLogButton(
+                icon = Icons.Default.Save,
+                label = StringResources.get("log.panel.export"),
+                enabled = selectedDevice != null && !isExecuting,
+                onClick = onExport
+            )
+            CompactLogButton(
+                icon = Icons.Default.Delete,
+                label = StringResources.get("log.panel.clear.device"),
+                enabled = selectedDevice != null && !isExecuting,
+                isDanger = true,
+                onClick = onClearDevice
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            CompactLogButton(
+                icon = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                label = if (isFullscreen) StringResources.get("log.panel.exit.fullscreen") else StringResources.get("log.panel.fullscreen"),
+                onClick = onToggleFullscreen
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactLogButton(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean = true,
+    isDanger: Boolean = false,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = when {
+                isDanger -> MaterialTheme.colorScheme.error
+                else -> MaterialTheme.colorScheme.primary
+            },
+            disabledContainerColor = when {
+                isDanger -> MaterialTheme.colorScheme.error.copy(alpha = 0.45f)
+                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+            }
+        ),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+        modifier = Modifier.height(34.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun LogFilterControls(
+    filterText: String,
+    excludeFilterText: String,
+    levelFilter: MainViewModel.LogLevel?,
+    enabled: Boolean,
+    onFilterChanged: (String) -> Unit,
+    onExcludeChanged: (String) -> Unit,
+    onLevelSelected: (MainViewModel.LogLevel?) -> Unit,
+    onResetFilters: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            OutlinedTextField(
+                value = filterText,
+                onValueChange = onFilterChanged,
+                label = { Text(StringResources.get("log.panel.filter")) },
+                placeholder = { Text(StringResources.get("log.panel.filter.placeholder")) },
+                modifier = Modifier.weight(1.3f).height(58.dp),
+                singleLine = true,
+                enabled = enabled,
+                trailingIcon = {
+                    if (filterText.isNotEmpty()) {
+                        IconButton(onClick = { onFilterChanged("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = StringResources.get("log.panel.clear.filter"))
+                        }
+                    }
+                },
+                textStyle = MaterialTheme.typography.bodyMedium
+            )
+            OutlinedTextField(
+                value = excludeFilterText,
+                onValueChange = onExcludeChanged,
+                label = { Text(StringResources.get("log.panel.exclude")) },
+                placeholder = { Text(StringResources.get("log.panel.exclude.placeholder")) },
+                modifier = Modifier.weight(1f).height(58.dp),
+                singleLine = true,
+                enabled = enabled,
+                trailingIcon = {
+                    if (excludeFilterText.isNotEmpty()) {
+                        IconButton(onClick = { onExcludeChanged("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = StringResources.get("log.panel.clear.filter"))
+                        }
+                    }
+                },
+                textStyle = MaterialTheme.typography.bodyMedium
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().height(32.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            LogLevelChip(
+                label = StringResources.get("log.panel.level.all"),
+                selected = levelFilter == null,
+                enabled = enabled,
+                onClick = { onLevelSelected(null) }
+            )
+            listOf(
+                MainViewModel.LogLevel.ERROR,
+                MainViewModel.LogLevel.WARN,
+                MainViewModel.LogLevel.INFO,
+                MainViewModel.LogLevel.DEBUG
+            ).forEach { level ->
+                LogLevelChip(
+                    label = level.displayName,
+                    selected = levelFilter == level,
+                    enabled = enabled,
+                    color = logLevelColor(level),
+                    onClick = { onLevelSelected(level) }
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Button(
+                onClick = onResetFilters,
+                enabled = enabled && (filterText.isNotBlank() || excludeFilterText.isNotBlank() || levelFilter != null),
+                modifier = Modifier.height(30.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp)
+            ) {
+                Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(15.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(StringResources.get("log.panel.reset.filters"), style = MaterialTheme.typography.labelSmall, maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LogLevelChip(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    color: Color = MaterialTheme.colorScheme.primary,
+    onClick: () -> Unit
+) {
+    val background = when {
+        selected -> color.copy(alpha = 0.22f)
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val textColor = when {
+        selected -> color
+        enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+    }
+
+    Surface(
+        modifier = Modifier
+            .height(30.dp)
+            .clickable(enabled = enabled, onClick = onClick),
+        color = background,
+        shape = MaterialTheme.shapes.small
+    ) {
+        Box(
+            modifier = Modifier.padding(horizontal = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                color = textColor,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun LogStatsBar(
+    isLogcatRunning: Boolean,
+    stats: MainViewModel.LogStreamStats,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Text(
+            text = if (isLogcatRunning) {
+                StringResources.get("log.panel.streaming.stats", stats.visible, stats.total, stats.important, stats.matched)
+            } else {
+                StringResources.get("log.panel.stopped.stats", stats.visible, stats.total, stats.important, stats.matched)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
 private fun LogLineItem(
-    line: String,
+    entry: MainViewModel.LogEntry,
     isFullscreen: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val fontSize = if (isFullscreen) 14.sp else 12.sp
     val lineHeight = if (isFullscreen) 18.sp else 16.sp
     val itemHeight = if (isFullscreen) 26.dp else 22.dp
+    val levelColor = logLevelColor(entry.level)
+    val backgroundColor = when {
+        entry.isHighlighted && entry.level == MainViewModel.LogLevel.ERROR -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f)
+        entry.isHighlighted -> levelColor.copy(alpha = 0.12f)
+        else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)
+    }
+    val annotatedLine = buildAnnotatedString {
+        entry.timestamp?.let { timestamp ->
+            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                append(timestamp)
+                append(" ")
+            }
+        }
+        withStyle(SpanStyle(color = levelColor, fontWeight = FontWeight.Bold)) {
+            append(entry.level.displayName)
+            append(" ")
+        }
+        entry.tag?.let { tag ->
+            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)) {
+                append(tag)
+                append(": ")
+            }
+        }
+        withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurface)) {
+            append(entry.message)
+        }
+    }
 
     Text(
-        text = line,
+        text = annotatedLine,
         fontSize = fontSize,
         fontFamily = FontFamily.Monospace,
-        color = MaterialTheme.colorScheme.onSurface,
         lineHeight = lineHeight,
         maxLines = 1,
         softWrap = false,
         modifier = modifier
             .height(itemHeight)
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.45f))
+            .background(backgroundColor)
             .padding(horizontal = 8.dp, vertical = 3.dp)
     )
+}
+
+@Composable
+private fun logLevelColor(level: MainViewModel.LogLevel): Color {
+    return when (level) {
+        MainViewModel.LogLevel.ERROR,
+        MainViewModel.LogLevel.ASSERT -> MaterialTheme.colorScheme.error
+        MainViewModel.LogLevel.WARN -> Color(0xFFB26A00)
+        MainViewModel.LogLevel.INFO -> MaterialTheme.colorScheme.primary
+        MainViewModel.LogLevel.DEBUG -> MaterialTheme.colorScheme.secondary
+        MainViewModel.LogLevel.VERBOSE -> MaterialTheme.colorScheme.onSurfaceVariant
+        MainViewModel.LogLevel.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
 }

@@ -62,6 +62,7 @@ import com.zhang.adbhub.common.model.AdbResult
 import com.zhang.adbhub.desktop.utils.StringResources
 import com.zhang.adbhub.desktop.viewmodel.MainViewModel
 import com.zhang.adbhub.desktop.viewmodel.OperationTab
+import kotlinx.coroutines.launch
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
@@ -80,6 +81,7 @@ fun OperationPanel(
     selectedTab: OperationTab,
     onTabSelected: (OperationTab) -> Unit,
     viewModel: MainViewModel,
+    toastState: ToastState,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.padding(16.dp)) {
@@ -96,10 +98,10 @@ fun OperationPanel(
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (selectedTab) {
                 OperationTab.PUSH_APK -> PushApkPanel(selectedDevice, viewModel)
-                OperationTab.DEVICE_COMMANDS -> VehicleDeviceCommandsPanel(selectedDevice, viewModel)
+                OperationTab.DEVICE_COMMANDS -> VehicleDeviceCommandsPanel(selectedDevice, viewModel, toastState)
                 OperationTab.APP_MANAGEMENT -> AppManagementPanel(selectedDevice, viewModel)
-                OperationTab.FILE_MANAGER -> FileManagerPanel(selectedDevice, viewModel)
-                OperationTab.LOGS -> VehicleDeviceCommandsPanel(selectedDevice, viewModel)
+                OperationTab.FILE_MANAGER -> {} // 暂时隐藏文件管理器
+                OperationTab.LOGS -> VehicleDeviceCommandsPanel(selectedDevice, viewModel, toastState)
             }
         }
     }
@@ -134,6 +136,8 @@ private fun OperationTabBar(
                 onClick = { onTabSelected(OperationTab.APP_MANAGEMENT) },
                 modifier = Modifier.weight(1f)
             )
+            // 文件管理器标签暂时隐藏，留更多空间给日志面板
+            /*
             OperationTabButton(
                 selected = selectedTab == OperationTab.FILE_MANAGER,
                 label = StringResources.get("operation.tab.file.manager"),
@@ -141,6 +145,7 @@ private fun OperationTabBar(
                 onClick = { onTabSelected(OperationTab.FILE_MANAGER) },
                 modifier = Modifier.weight(1f)
             )
+            */
         }
         HorizontalDivider()
     }
@@ -379,7 +384,8 @@ private enum class DeviceCommandType {
     VEHICLE_INFO,
     DISPLAY_INFO,
     CURRENT_FOCUS,
-    SCREENSHOT
+    SCREENSHOT,
+    ROOT_RESTART  // 会导致设备重启 ADB daemon 的命令
 }
 
 private data class DeviceCommandAction(
@@ -402,10 +408,15 @@ private data class DeviceCommandResult(
 )
 
 @Composable
-fun VehicleDeviceCommandsPanel(selectedDevice: Device?, viewModel: MainViewModel) {
+fun VehicleDeviceCommandsPanel(
+    selectedDevice: Device?,
+    viewModel: MainViewModel,
+    toastState: ToastState
+) {
     val resultState = remember { mutableStateOf<DeviceCommandResult?>(null) }
     val runningCommandIdState = remember { mutableStateOf<String?>(null) }
     var screenshotPreviewFile by remember { mutableStateOf<File?>(null) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(selectedDevice?.serialNumber) {
         resultState.value = null
@@ -438,6 +449,7 @@ fun VehicleDeviceCommandsPanel(selectedDevice: Device?, viewModel: MainViewModel
             viewModel = viewModel,
             resultState = resultState,
             runningCommandIdState = runningCommandIdState,
+            toastState = toastState,
             onScreenshotReady = { screenshotPreviewFile = it },
             modifier = Modifier
                 .weight(1f)
@@ -469,6 +481,7 @@ private fun DeviceCommandList(
     viewModel: MainViewModel,
     resultState: MutableState<DeviceCommandResult?>,
     runningCommandIdState: MutableState<String?>,
+    toastState: ToastState,
     onScreenshotReady: (File) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -477,6 +490,7 @@ private fun DeviceCommandList(
     val runningCommandId = runningCommandIdState.value
     val commandGroups = remember(Unit) { buildVehicleCommandGroups() }
     val allCommands = remember(Unit) { commandGroups.flatMap { it.actions } }
+    val scope = rememberCoroutineScope()
     var favoriteCommandIds by remember {
         mutableStateOf(com.zhang.adbhub.common.config.AdbConfig.load().favoriteCommandIds)
     }
@@ -498,6 +512,7 @@ private fun DeviceCommandList(
 
     fun executeAction(action: DeviceCommandAction) {
         if (isExecuting) return
+
         runningCommandIdState.value = action.id
         resultState.value = DeviceCommandResult(
             title = action.title,
@@ -519,6 +534,12 @@ private fun DeviceCommandList(
                             commandType = action.commandType
                         )
                         onScreenshotReady(result.data)
+                        scope.launch {
+                            toastState.showToast(
+                                message = StringResources.get("operation.command.success", action.title),
+                                type = ToastType.SUCCESS
+                            )
+                        }
                     }
                     is AdbResult.Error -> {
                         resultState.value = DeviceCommandResult(
@@ -527,9 +548,91 @@ private fun DeviceCommandList(
                             output = result.message,
                             commandType = action.commandType
                         )
+                        scope.launch {
+                            toastState.showToast(
+                                message = StringResources.get("operation.command.failed", action.title),
+                                type = ToastType.ERROR
+                            )
+                        }
                     }
                 }
                 runningCommandIdState.value = null
+            }
+        } else if (action.commandType == DeviceCommandType.ROOT_RESTART) {
+            // 使用专门的 root/remount 方法
+            when (action.commandPreview) {
+                "root" -> {
+                    viewModel.executeRoot { result ->
+                        resultState.value = DeviceCommandResult(
+                            title = action.title,
+                            commandPreview = action.commandPreview,
+                            output = result,
+                            commandType = action.commandType
+                        )
+                        runningCommandIdState.value = null
+
+                        val isSuccess = !result.contains("失败", ignoreCase = true) &&
+                                       !result.contains("failed", ignoreCase = true) &&
+                                       !result.contains("error", ignoreCase = true)
+                        scope.launch {
+                            toastState.showToast(
+                                message = StringResources.get(
+                                    if (isSuccess) "operation.command.success" else "operation.command.failed",
+                                    action.title
+                                ),
+                                type = if (isSuccess) ToastType.SUCCESS else ToastType.ERROR
+                            )
+                        }
+                    }
+                }
+                "remount" -> {
+                    viewModel.executeRemount { result ->
+                        resultState.value = DeviceCommandResult(
+                            title = action.title,
+                            commandPreview = action.commandPreview,
+                            output = result,
+                            commandType = action.commandType
+                        )
+                        runningCommandIdState.value = null
+
+                        val isSuccess = !result.contains("失败", ignoreCase = true) &&
+                                       !result.contains("failed", ignoreCase = true) &&
+                                       !result.contains("error", ignoreCase = true)
+                        scope.launch {
+                            toastState.showToast(
+                                message = StringResources.get(
+                                    if (isSuccess) "operation.command.success" else "operation.command.failed",
+                                    action.title
+                                ),
+                                type = if (isSuccess) ToastType.SUCCESS else ToastType.ERROR
+                            )
+                        }
+                    }
+                }
+                else -> {
+                    viewModel.executeDeviceCommand(action.title, action.arguments) { result ->
+                        resultState.value = DeviceCommandResult(
+                            title = action.title,
+                            commandPreview = action.commandPreview,
+                            output = result,
+                            commandType = action.commandType
+                        )
+                        runningCommandIdState.value = null
+
+                        val isSuccess = !result.contains("失败", ignoreCase = true) &&
+                                       !result.contains("failed", ignoreCase = true) &&
+                                       !result.contains("error", ignoreCase = true)
+                        scope.launch {
+                            toastState.showToast(
+                                message = StringResources.get(
+                                    if (isSuccess) "operation.command.success" else "operation.command.failed",
+                                    action.title
+                                ),
+                                type = if (isSuccess) ToastType.SUCCESS else ToastType.ERROR
+                            )
+                        }
+                    }
+                }
             }
         } else {
             viewModel.executeDeviceCommand(action.title, action.arguments) { result ->
@@ -540,6 +643,19 @@ private fun DeviceCommandList(
                     commandType = action.commandType
                 )
                 runningCommandIdState.value = null
+
+                val isSuccess = !result.contains("失败", ignoreCase = true) &&
+                               !result.contains("failed", ignoreCase = true) &&
+                               !result.contains("error", ignoreCase = true)
+                scope.launch {
+                    toastState.showToast(
+                        message = StringResources.get(
+                            if (isSuccess) "operation.command.success" else "operation.command.failed",
+                            action.title
+                        ),
+                        type = if (isSuccess) ToastType.SUCCESS else ToastType.ERROR
+                    )
+                }
             }
         }
     }
@@ -894,6 +1010,10 @@ private fun parseCommandResult(result: DeviceCommandResult): com.zhang.adbhub.co
         DeviceCommandType.DISPLAY_INFO -> com.zhang.adbhub.common.utils.CommandOutputParser.parseDisplayInfo(result.output)
         DeviceCommandType.CURRENT_FOCUS -> com.zhang.adbhub.common.utils.CommandOutputParser.parseCurrentFocus(result.output)
         DeviceCommandType.SCREENSHOT -> com.zhang.adbhub.common.utils.CommandOutputParser.parseScreenshot(result.output)
+        DeviceCommandType.ROOT_RESTART -> com.zhang.adbhub.common.utils.CommandOutputParser.ParsedOutput(
+            summary = result.output,
+            rawOutput = result.output
+        )
         DeviceCommandType.RAW -> com.zhang.adbhub.common.utils.CommandOutputParser.ParsedOutput(
             summary = result.output,
             rawOutput = result.output
@@ -1269,14 +1389,16 @@ private fun buildVehicleCommandGroups(): List<DeviceCommandGroup> {
                     description = StringResources.get("operation.command.root.desc"),
                     commandPreview = "root",
                     arguments = listOf("root"),
-                    icon = Icons.Default.Security
+                    icon = Icons.Default.Security,
+                    commandType = DeviceCommandType.ROOT_RESTART
                 ),
                 DeviceCommandAction(
                     title = StringResources.get("operation.command.remount"),
                     description = StringResources.get("operation.command.remount.desc"),
                     commandPreview = "remount",
                     arguments = listOf("remount"),
-                    icon = Icons.Default.Build
+                    icon = Icons.Default.Build,
+                    commandType = DeviceCommandType.ROOT_RESTART
                 ),
                 DeviceCommandAction(
                     title = StringResources.get("operation.command.disable.verity"),
